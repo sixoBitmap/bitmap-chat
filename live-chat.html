@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BITMAP OASIS (P2P Multi-Chat + Tiny Signaling)</title>
+<style>
+  :root{
+    --orange:#ff6a00;
+    --orange-dim:#cc5500;
+    --orange-glow:rgba(255,106,0,.55);
+    --bg:#000;
+    --panel:rgba(15,8,0,.96);
+    --panel2:rgba(10,5,0,.98);
+    --text-dim:#803300;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    height:100vh; overflow:hidden;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+    background:var(--bg); color:var(--orange);
+  }
+  .scanlines{
+    position:fixed; inset:0; pointer-events:none; z-index:9999;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,.15) 0, rgba(0,0,0,.15) 1px, transparent 1px, transparent 2px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0, rgba(0,0,0,.08) 1px, transparent 1px, transparent 2px);
+  }
+  .scanlines::after{
+    content:""; position:fixed; inset:0; pointer-events:none;
+    background:rgba(255,106,0,.02); animation:flicker .12s infinite;
+  }
+  @keyframes flicker{0%,100%{opacity:.97}50%{opacity:1}}
+
+  #connectScreen{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    z-index:50; background:#000;
+  }
+  .connect{
+    width:min(1080px, 94vw);
+    background:linear-gradient(180deg,var(--panel) 0,var(--panel2) 100%);
+    border:2px solid var(--orange);
+    box-shadow:0 0 30px var(--orange-glow), inset 0 0 40px rgba(255,106,0,.05);
+    padding:18px;
+  }
+  .header{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border-bottom:1px solid var(--orange-dim);
+    padding-bottom:12px; margin-bottom:14px;
+  }
+  .title{
+    letter-spacing:6px; font-weight:800; font-size:1.2rem;
+    text-shadow:0 0 12px var(--orange-glow);
+  }
+  .sub{
+    font-size:.72rem; color:var(--text-dim); letter-spacing:2px;
+  }
+  .pill{
+    display:inline-block; padding:6px 10px;
+    border:1px solid var(--orange-dim);
+    color:var(--text-dim); font-size:.68rem; letter-spacing:1px;
+  }
+
+  .grid{
+    display:grid; grid-template-columns: 1fr 1fr; gap:14px;
+  }
+  .box{
+    border:1px solid var(--orange-dim);
+    background:rgba(20,10,0,.65);
+    padding:12px;
+  }
+  .box h3{
+    font-size:.78rem; letter-spacing:3px; margin-bottom:10px;
+    color:var(--orange); text-shadow:0 0 10px var(--orange-glow);
+  }
+  label{
+    display:block; font-size:.7rem; color:var(--orange); margin:10px 0 6px;
+  }
+  input, textarea{
+    width:100%;
+    background:rgba(10,5,0,.95);
+    border:1px solid var(--orange-dim);
+    color:var(--orange);
+    padding:10px 10px;
+    outline:none;
+    font:inherit;
+    font-size:.74rem;
+  }
+  textarea{min-height:120px; resize:vertical; line-height:1.35}
+  .btn{
+    width:100%;
+    margin-top:10px;
+    padding:12px 12px;
+    background:transparent;
+    color:var(--orange);
+    border:2px solid var(--orange);
+    cursor:pointer;
+    font-weight:800;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    transition: all .15s;
+  }
+  .btn:hover{background:rgba(255,106,0,.10); box-shadow:0 0 22px var(--orange-glow)}
+  .btn:disabled{opacity:.35; cursor:not-allowed; box-shadow:none}
+  .row{display:flex; gap:10px; align-items:center}
+  .btn.small{padding:8px 10px; margin-top:0; font-size:.72rem; letter-spacing:1px}
+
+  .status{
+    margin-top:12px; font-size:.72rem; color:var(--text-dim);
+    padding:10px; border:1px solid rgba(255,106,0,.25);
+    background:rgba(0,0,0,.25);
+  }
+  .ok{color:var(--orange); text-shadow:0 0 8px var(--orange-glow)}
+  .err{color:#ff4444; text-shadow:0 0 8px rgba(255,70,70,.5)}
+  .warn{color:#ffaa33; text-shadow:0 0 8px rgba(255,170,50,.35)}
+  .tiny{font-size:.68rem; opacity:.92}
+
+  #chatScreen{
+    display:none; position:fixed; inset:0;
+  }
+  .chatWrap{
+    position:fixed; inset:0;
+    display:grid;
+    grid-template-columns: 1fr 340px;
+    gap:14px;
+    padding:16px;
+  }
+  .panel{
+    background:linear-gradient(180deg,var(--panel) 0,var(--panel2) 100%);
+    border:1px solid var(--orange);
+    box-shadow:0 0 18px rgba(255,106,0,.25), inset 0 0 20px rgba(255,106,0,.04);
+  }
+  .chatMain{
+    display:flex; flex-direction:column; min-width:0;
+  }
+  .chatTop{
+    padding:10px 12px;
+    border-bottom:1px solid var(--orange-dim);
+    font-size:.72rem; color:var(--orange-dim); letter-spacing:1px;
+  }
+  .chatTop span{color:var(--orange); text-shadow:0 0 8px var(--orange-glow)}
+  .chatLog{
+    flex:1;
+    overflow:auto;
+    padding:10px 12px;
+    font-size:.76rem;
+  }
+  .msg{margin:0 0 6px; line-height:1.35; word-break:break-word}
+  .msg .name{color:#ff8c33; text-shadow:0 0 6px var(--orange-glow)}
+  .msg .you{color:#ffaa00; text-shadow:0 0 7px rgba(255,170,0,.6)}
+  .msg.sys{color:var(--orange-dim); font-style:italic}
+  .chatInputWrap{
+    border-top:1px solid var(--orange-dim);
+    padding:10px 12px;
+    display:flex; gap:10px;
+  }
+  .chatInput{
+    flex:1;
+    border:1px solid var(--orange);
+  }
+  .side{
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .sideBox{
+    padding:12px;
+  }
+  .list{
+    margin-top:8px; font-size:.74rem; color:var(--orange);
+    border-top:1px solid rgba(255,106,0,.25); padding-top:8px;
+  }
+  .listItem{display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid rgba(255,106,0,.12)}
+  .badge{color:var(--orange-dim); font-size:.68rem; white-space:nowrap}
+  .hint{font-size:.68rem; color:var(--text-dim); margin-top:8px; line-height:1.35}
+
+  @media (max-width: 980px){
+    .chatWrap{grid-template-columns:1fr}
+  }
+
+  /* Chat input row: make input bigger, send button narrower */
+.chatInputWrap .chatInput{
+  flex: 1 1 auto;          /* take remaining space */
+  padding: 14px 12px;      /* taller input */
+  font-size: .82rem;       /* slightly bigger text */
+}
+
+/* Override global .btn{width:100%} just for the send button row */
+.chatInputWrap .btn.small{
+  width: 96px;             /* smaller button */
+  flex: 0 0 96px;          /* fixed width */
+  margin-top: 0;           /* remove top margin from .btn */
+  padding: 10px 10px;      /* tighter */
+}
+</style>
+</head>
+
+<body>
+<div class="scanlines"></div>
+
+<div id="connectScreen">
+  <div class="connect">
+    <div class="header">
+      <div>
+        <div class="title">BITMAP OASIS</div>
+        <div class="sub">OPEN FILE IN BROWSER • TINY SIGNAL SERVER • AUTO JOIN</div>
+      </div>
+      <div class="pill" id="secPill">STUN: ON</div>
+    </div>
+
+    <div class="grid">
+      <div class="box">
+        <h3>ENTER ROOM</h3>
+
+        <label>Nickname</label>
+        <input id="nameIn" placeholder="e.g. ORANGEFOX" maxlength="16"/>
+
+        <label>Room code</label>
+        <input id="roomIn" placeholder="e.g. BITMAP" maxlength="20"/>
+
+        <div class="row" style="margin-top:8px;">
+          <button class="btn small" id="btnRandomRoom">RANDOM ROOM</button>
+          <button class="btn small" id="btnJoin">JOIN</button>
+        </div>
+
+        <div class="status tiny warn">
+          Room code allowed: A-Z, 0-9, dash (-). 3..20 chars.
+        </div>
+
+        <div class="status tiny" id="joinStatus">Fill nickname + room and press JOIN.</div>
+      </div>
+
+      <div class="box">
+        <h3>SIGNAL SERVER</h3>
+
+        <label>WebSocket URL</label>
+        <input id="serverIn" placeholder="ws://127.0.0.1:8080" />
+
+        <button class="btn" id="btnToggleStun">TOGGLE STUN (ADVANCED)</button>
+        <div class="status tiny warn">
+          STUN ON works best across the internet. Some networks still need TURN for full reliability.
+        </div>
+
+        <div class="status tiny" id="serverStatus">Server: not connected.</div>
+      </div>
+    </div>
+
+    <div class="status" id="globalStatus">Ready.</div>
+  </div>
+</div>
+
+<div id="chatScreen">
+  <div class="chatWrap">
+    <div class="panel chatMain">
+      <div class="chatTop">
+        YOU: <span id="meName">--</span>
+        <span style="opacity:.5"> | </span>
+        ROOM: <span id="roomTop">--</span>
+        <span style="opacity:.5"> | </span>
+        WS: <span id="wsTop">--</span>
+        <span style="opacity:.5"> | </span>
+        PEERS: <span id="peerCount">0</span>
+      </div>
+
+      <div class="chatLog" id="chatLog"></div>
+
+      <div class="chatInputWrap">
+        <input class="chatInput" id="chatInput" placeholder="Type message… (Enter to send)" maxlength="240" />
+        <button class="btn small" id="btnSend">SEND</button>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="panel sideBox">
+        <h3 style="font-size:.78rem; letter-spacing:3px; margin-bottom:8px;">ONLINE</h3>
+        <div class="list" id="peerList"></div>
+        <div class="hint">Badge: OPEN / CONNECTING / OFFLINE</div>
+      </div>
+
+      <div class="panel sideBox">
+        <h3 style="font-size:.78rem; letter-spacing:3px; margin-bottom:8px;">ROOM</h3>
+
+        <label>Share this room code</label>
+        <input id="roomOut" readonly />
+
+        <div class="row" style="margin-top:8px;">
+          <button class="btn small" id="btnCopyRoom">COPY</button>
+          <button class="btn small" id="btnLeave">LEAVE</button>
+        </div>
+
+        <div class="hint">
+          Running from file:// is fine. Clipboard may be restricted, so COPY uses a fallback method.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  function setGlobalStatus(text, cls="") {
+    const el = $("globalStatus");
+    el.textContent = text;
+    el.className = "status " + cls;
+  }
+  function setJoinStatus(text, cls="") {
+    const el = $("joinStatus");
+    el.textContent = text;
+    el.className = "status tiny " + cls;
+  }
+  function setServerStatus(text, cls="") {
+    const el = $("serverStatus");
+    el.textContent = text;
+    el.className = "status tiny " + cls;
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function addSys(text) {
+    const log = $("chatLog");
+    const row = document.createElement("div");
+    row.className = "msg sys";
+    row.textContent = "> " + text;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function addMsg(name, text, isYou=false) {
+    const log = $("chatLog");
+    const row = document.createElement("div");
+    row.className = "msg";
+    const cls = isYou ? "name you" : "name";
+    row.innerHTML = `<span class="${cls}">${escapeHtml(name)}:</span> ${escapeHtml(text)}`;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // Clipboard helper for file://
+  async function copyText(text) {
+    // Try modern clipboard first
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {}
+
+    // Fallback: hidden textarea + execCommand
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function randName(prefix="USER") {
+    return (prefix + Math.random().toString(36).slice(2, 6)).toUpperCase();
+  }
+  function randRoom() {
+    return ("BITMAP-" + Math.random().toString(36).slice(2, 7)).toUpperCase();
+  }
+  function normalizeRoomCode(raw) {
+    const code = String(raw || "").trim().toUpperCase();
+    if (!/^[A-Z0-9-]{3,20}$/.test(code)) return null;
+    return code;
+  }
+  function makeMsgId() {
+    return "M_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+
+  // ---------------- WebRTC config ----------------
+  let ICE_SERVERS = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ];
+
+  // ---------------- State ----------------
+  let ws = null;
+  let wsUrl = "ws://127.0.0.1:8080";
+  let myId = null;
+  let myName = "--";
+  let roomCode = "--";
+
+  // peerId -> { pc, dc, name, state }
+  const peers = new Map();
+  // peerId -> name (known by server)
+  const roomMembers = new Map();
+
+  // message de-dupe (safety)
+  const seen = new Set();
+  function remember(id) {
+    seen.add(id);
+    if (seen.size > 1500) {
+      const a = Array.from(seen);
+      seen.clear();
+      for (const x of a.slice(-900)) seen.add(x);
+    }
+  }
+
+  function enterChatScreen() {
+    $("connectScreen").style.display = "none";
+    $("chatScreen").style.display = "block";
+    $("meName").textContent = myName;
+    $("roomTop").textContent = roomCode;
+    $("wsTop").textContent = ws && ws.readyState === 1 ? "ON" : "OFF";
+    $("roomOut").value = roomCode;
+    updatePeerUI();
+
+    if (location.protocol === "file:") {
+      addSys("Running from file:// ✅ (clipboard may be restricted; COPY uses fallback)");
+    }
+  }
+
+  function leaveChat() {
+    try { ws?.close(); } catch {}
+    ws = null;
+
+    for (const [pid, p] of peers.entries()) {
+      try { p.dc?.close(); } catch {}
+      try { p.pc?.close(); } catch {}
+      peers.delete(pid);
+    }
+    roomMembers.clear();
+    myId = null;
+
+    $("chatScreen").style.display = "none";
+    $("connectScreen").style.display = "flex";
+
+    setServerStatus("Server: not connected.", "warn");
+    setJoinStatus("Fill nickname + room and press JOIN.", "");
+    setGlobalStatus("Ready.", "warn");
+  }
+
+  function updatePeerUI() {
+    $("peerCount").textContent = String(roomMembers.size ? roomMembers.size - (myId ? 1 : 0) : peers.size);
+
+    const list = $("peerList");
+    list.innerHTML = "";
+
+    if (!roomMembers.size) {
+      list.innerHTML = `<div class="badge">No peers yet.</div>`;
+      return;
+    }
+
+    const entries = Array.from(roomMembers.entries())
+      .filter(([id]) => id !== myId)
+      .sort((a,b) => String(a[1]||a[0]).localeCompare(String(b[1]||b[0])));
+
+    if (!entries.length) {
+      list.innerHTML = `<div class="badge">You are alone in this room.</div>`;
+      return;
+    }
+
+    for (const [id, nmRaw] of entries) {
+      const nm = (nmRaw || id).slice(0,16);
+      const p = peers.get(id);
+      const st = p?.state || "OFFLINE";
+      const item = document.createElement("div");
+      item.className = "listItem";
+      item.innerHTML = `<span>${escapeHtml(nm)}</span><span class="badge">${escapeHtml(st)}</span>`;
+      list.appendChild(item);
+    }
+  }
+
+  // ---------------- WS helpers ----------------
+  function wsSend(obj) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  }
+
+  // ---------------- WebRTC helpers ----------------
+  function makePc(peerId) {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        wsSend({ type:"signal", to: peerId, data: { kind:"candidate", candidate: e.candidate } });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      const p = peers.get(peerId);
+      if (!p) return;
+      const cs = pc.connectionState;
+      if (cs === "failed") {
+        p.state = "FAILED";
+        addSys("Connection failed with " + (p.name || peerId) + ".");
+        updatePeerUI();
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      const s = pc.iceConnectionState;
+      if (s === "failed") addSys("ICE failed with " + (roomMembers.get(peerId) || peerId) + ". TURN may be needed.");
+    };
+
+    return pc;
+  }
+
+  function sendDc(dc, obj) {
+    if (!dc || dc.readyState !== "open") return;
+    try { dc.send(JSON.stringify(obj)); } catch {}
+  }
+
+  function wireDc(peerId, dc) {
+    dc.onopen = () => {
+      const p = peers.get(peerId);
+      if (p) p.state = "OPEN";
+      updatePeerUI();
+
+      sendDc(dc, { type:"hello", name: myName, id: myId });
+      addSys("Link open: " + (roomMembers.get(peerId) || peerId));
+    };
+
+    dc.onclose = () => {
+      const p = peers.get(peerId);
+      if (p) p.state = "OFFLINE";
+      updatePeerUI();
+      addSys("Link closed: " + (roomMembers.get(peerId) || peerId));
+    };
+
+    dc.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+
+      if (msg.type === "hello") {
+        const nm = String(msg.name || "").slice(0,16);
+        if (nm) roomMembers.set(peerId, nm);
+        const p = peers.get(peerId);
+        if (p) p.name = nm || p.name;
+        updatePeerUI();
+        return;
+      }
+
+      if (msg.type === "chat") {
+        const id = String(msg.id || "");
+        if (!id || seen.has(id)) return;
+        remember(id);
+        addMsg(String(msg.from || "PEER"), String(msg.text || ""), false);
+        return;
+      }
+
+      if (msg.type === "sys") addSys(String(msg.text || ""));
+    };
+  }
+
+  async function connectToPeer(peerId, peerName, initiator) {
+    if (!peerId || peerId === myId) return;
+    if (peers.has(peerId)) return;
+
+    const pc = makePc(peerId);
+    const entry = { pc, dc: null, name: (peerName || roomMembers.get(peerId) || peerId), state: "CONNECTING" };
+    peers.set(peerId, entry);
+    updatePeerUI();
+
+    if (initiator) {
+      const dc = pc.createDataChannel("oasis", { ordered: true });
+      entry.dc = dc;
+      wireDc(peerId, dc);
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      wsSend({ type:"signal", to: peerId, data: { kind:"offer", sdp: pc.localDescription } });
+    } else {
+      pc.ondatachannel = (ev) => {
+        entry.dc = ev.channel;
+        wireDc(peerId, entry.dc);
+      };
+    }
+  }
+
+  async function handleSignal(from, data) {
+    const kind = data?.kind;
+
+    if (kind === "offer") {
+      await connectToPeer(from, roomMembers.get(from), false);
+      const peer = peers.get(from);
+      if (!peer) return;
+
+      await peer.pc.setRemoteDescription(data.sdp);
+      const answer = await peer.pc.createAnswer();
+      await peer.pc.setLocalDescription(answer);
+
+      wsSend({ type:"signal", to: from, data: { kind:"answer", sdp: peer.pc.localDescription } });
+      return;
+    }
+
+    if (kind === "answer") {
+      const peer = peers.get(from);
+      if (!peer) return;
+      await peer.pc.setRemoteDescription(data.sdp);
+      return;
+    }
+
+    if (kind === "candidate") {
+      const peer = peers.get(from);
+      if (!peer) return;
+      try { await peer.pc.addIceCandidate(data.candidate); } catch {}
+    }
+  }
+
+  // ---------------- Join room ----------------
+  function joinRoom() {
+    const nm = ($("nameIn").value.trim() || randName("USER")).slice(0,16);
+    const rc = normalizeRoomCode($("roomIn").value);
+    if (!rc) {
+      setJoinStatus("Invalid room code. Use A-Z, 0-9, dash (-). 3..20 chars.", "err");
+      return;
+    }
+
+    myName = nm;
+    roomCode = rc;
+    wsUrl = ($("serverIn").value.trim() || "ws://127.0.0.1:8080");
+
+    setJoinStatus("Connecting to server…", "warn");
+    setServerStatus("Server: connecting…", "warn");
+    setGlobalStatus("Joining room " + roomCode + "…", "warn");
+
+    peers.clear();
+    roomMembers.clear();
+
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      setServerStatus("Server: connected.", "ok");
+      wsSend({ type:"join", room: roomCode, name: myName });
+    };
+
+    ws.onmessage = async (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+
+      if (msg.type === "error") {
+        setGlobalStatus("Server error: " + String(msg.error || "unknown"), "err");
+        setServerStatus("Server: error.", "err");
+        return;
+      }
+
+      if (msg.type === "welcome") {
+        myId = msg.id;
+
+        roomMembers.set(myId, myName);
+        for (const p of (msg.peers || [])) {
+          roomMembers.set(p.id, String(p.name || p.id).slice(0,16));
+        }
+
+        setJoinStatus("Joined. Auto-connecting peers…", "ok");
+        setGlobalStatus("Room joined. Peers will auto-connect.", "ok");
+
+        enterChatScreen();
+        addSys("Joined room " + roomCode + " as " + myName + ".");
+        addSys("Open this same HTML file in another browser/device and join the same room.");
+        updatePeerUI();
+        return;
+      }
+
+      if (msg.type === "peer-joined") {
+        const pid = msg.peer?.id;
+        const pname = String(msg.peer?.name || pid || "").slice(0,16);
+        if (!pid) return;
+
+        roomMembers.set(pid, pname);
+        updatePeerUI();
+
+        // Existing peers initiate offers to the newcomer (prevents offer collisions)
+        try { await connectToPeer(pid, pname, true); }
+        catch { addSys("Could not start link to " + pname + "."); }
+        return;
+      }
+
+      if (msg.type === "peer-left") {
+        const pid = msg.id;
+        roomMembers.delete(pid);
+
+        const p = peers.get(pid);
+        if (p) {
+          try { p.dc?.close(); } catch {}
+          try { p.pc?.close(); } catch {}
+          peers.delete(pid);
+        }
+
+        updatePeerUI();
+        addSys("Peer left: " + String(pid || ""));
+        return;
+      }
+
+      if (msg.type === "signal") {
+        await handleSignal(msg.from, msg.data);
+      }
+    };
+
+    ws.onclose = () => {
+      $("wsTop").textContent = "OFF";
+      setServerStatus("Server: disconnected.", "warn");
+      addSys("WebSocket disconnected.");
+    };
+
+    ws.onerror = () => {
+      setServerStatus("Server: connection failed.", "err");
+      setGlobalStatus("Could not connect to signaling server.", "err");
+    };
+  }
+
+  // ---------------- Chat sending ----------------
+  function broadcastChat(text) {
+    const id = makeMsgId();
+    remember(id);
+
+    addMsg(myName, text, true);
+
+    const msg = { type:"chat", id, from: myName, text: String(text).slice(0,240), ts: Date.now() };
+
+    for (const [, p] of peers.entries()) {
+      if (p.dc && p.dc.readyState === "open") sendDc(p.dc, msg);
+    }
+  }
+
+  function sendChat() {
+    const input = $("chatInput");
+    const text = input.value.trim();
+    if (!text) return;
+    broadcastChat(text);
+    input.value = "";
+    input.focus();
+  }
+
+  // ---------------- Buttons ----------------
+  $("btnJoin").addEventListener("click", joinRoom);
+
+  $("btnRandomRoom").addEventListener("click", () => {
+    $("roomIn").value = randRoom();
+  });
+
+  $("btnSend").addEventListener("click", sendChat);
+  $("chatInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      sendChat();
+    }
+  });
+
+  $("btnCopyRoom").addEventListener("click", async () => {
+    const ok = await copyText(roomCode);
+    if (ok) addSys("Room code copied.");
+    else addSys("Copy failed. Manually copy: " + roomCode);
+  });
+
+  $("btnLeave").addEventListener("click", () => {
+    leaveChat();
+  });
+
+  $("btnToggleStun").addEventListener("click", () => {
+    const pill = $("secPill");
+    if (ICE_SERVERS.length) {
+      ICE_SERVERS = [];
+      pill.textContent = "STUN: OFF";
+      pill.style.color = "#ffaa33";
+      setGlobalStatus("STUN OFF (best on same Wi-Fi).", "warn");
+    } else {
+      ICE_SERVERS = [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" }
+      ];
+      pill.textContent = "STUN: ON";
+      pill.style.color = "";
+      setGlobalStatus("STUN ON (better across internet).", "ok");
+    }
+  });
+
+  // Defaults
+  $("serverIn").value = "ws://127.0.0.1:8080";
+  $("nameIn").value = randName("USER");
+  $("roomIn").value = "BITMAP";
+
+  setGlobalStatus("Run node server.js, then open this HTML file and JOIN.", "warn");
+})();
+</script>
+</body>
+</html>
