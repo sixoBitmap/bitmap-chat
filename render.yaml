@@ -10,7 +10,7 @@ services:
     runtime: docker
     plan: starter            # a persistent disk needs a paid instance
     region: frankfurt        # match the btcmail service's region
-    branch: master
+    branch: main
     healthCheckPath: /health
     autoDeploy: true
     disk:

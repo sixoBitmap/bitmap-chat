@@ -13,23 +13,16 @@ account, same dashboard, same billing; separate container.
 
 ## 1 · Put the code on GitHub
 
-The folder is not a git repo yet. From `C:\Users\peran\Downloads\bitmap-ai-chat`:
+Already done: the code lives on the **`main`** branch of
+`github.com/sixoBitmap/bitmap-chat`.
 
-```bash
-git init -b master && git add -A && git commit -m "Bitmap Chat"
-```
+`.gitignore` keeps `.env`, `.jwt-secret`, `.admin.json`, `.claims.json`,
+`.questions.json`, `.free-quota.json` and `.system-prompt.txt` out of the repo
+— check `git status` still shows none of them before any future push.
 
-`.gitignore` already keeps `.env`, `.jwt-secret`, `.admin.json`,
-`.claims.json`, `.questions.json`, `.free-quota.json` and
-`.system-prompt.txt` out of the repo. Check `git status` shows none of them
-before pushing.
-
-Create an empty repo on GitHub (private is fine — Render can read it after you
-authorise the account), then:
-
-```bash
-git remote add origin https://github.com/sixoBitmap/bitmap-chat.git && git push -u origin master
-```
+That repo previously held an unrelated `live-chat.html` prototype; `main` was
+overwritten on purpose. The old commit is still reachable through the `mm` tag
+that was already on it, so nothing is actually gone.
 
 ## 2 · Create the Render service
 
