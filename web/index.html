@@ -1,0 +1,2033 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitmap Chat</title>
+<style>
+  :root{
+    --paper:#0d1117; --panel:#161b22; --panel-2:#1c2330; --ink:#e6edf3;
+    --muted:#8b949e; --line:#2d333b; --accent:#e3b341; --ok:#3fb950; --bad:#f85149;
+    --child:#30363d; --rein:#a371f7; --neighbor:#58a6ff;
+  }
+  *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px;border:2px solid var(--panel)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+  ::-webkit-scrollbar-corner{background:transparent}
+  html,body{height:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:16px;margin:0 8px 0 0;color:var(--accent);white-space:nowrap}
+  header input[type=number]{width:130px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 10px;font-size:14px}
+  #imgToggle{padding:6px 9px}
+  #imgToggle svg{width:16px;height:16px;display:block}
+  #imgToggle .slash{display:none;stroke:var(--bad)}
+  #imgToggle.off{border-color:var(--bad);color:var(--bad)}
+  #imgToggle.off .slash{display:block}
+  .btn{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:14px}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#151515;font-weight:600}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.small{padding:4px 9px;font-size:12px}
+  #progress{display:none;padding:7px 14px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:13px}
+  #progress.on{display:flex;gap:10px;align-items:center}
+  #progress .bar{flex:1;height:4px;background:var(--panel-2);border-radius:2px;overflow:hidden;position:relative}
+  #progress .bar i{position:absolute;inset:0;width:35%;background:var(--accent);border-radius:2px;animation:slide 1.2s ease-in-out infinite alternate}
+  #progress.done .bar i{width:100%;animation:none;background:var(--ok)}
+  #progress.err{color:var(--bad)}
+  @keyframes slide{from{left:0}to{left:65%}}
+  main{flex:1;display:grid;grid-template-columns:3fr 2fr;min-height:0}
+  @media (max-width:900px){ main{grid-template-columns:1fr;grid-template-rows:1fr 1fr} }
+  /* chat pane */
+  #chatPane{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--line)}
+  #msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .msg{max-width:92%;padding:9px 12px;border-radius:10px;overflow-wrap:break-word}
+  .msg.user{align-self:flex-end;background:var(--panel-2);border:1px solid var(--line);white-space:pre-wrap}
+  .msg.ai{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
+  .msg.ai.err{border-color:var(--bad);color:var(--bad)}
+  .msg.ai p{margin:.35em 0}
+  .msg.ai pre{background:#0a0d12;border:1px solid var(--line);border-radius:8px;padding:8px;overflow-x:auto;font-size:12.5px}
+  .msg.ai code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+  .msg.ai table{border-collapse:collapse;margin:.4em 0;display:block;overflow-x:auto}
+  .msg.ai th,.msg.ai td{border:1px solid var(--line);padding:3px 8px;font-size:12.5px}
+  .msg.ai a{color:var(--neighbor)}
+  .msg.ai .mermaid-svg{background:#0a0d12;border:1px solid var(--line);border-radius:8px;padding:6px;margin:.4em 0;overflow-x:auto}
+  .msg.ai .mermaid-svg svg{max-width:100%;height:auto}
+  .note{align-self:center;color:var(--muted);font-size:12.5px;text-align:center}
+  #composer{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--panel)}
+  #composer textarea{flex:1;resize:none;height:58px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit}
+  #composer .col{display:flex;flex-direction:column;gap:6px}
+  /* family explorer (file-tree) pane */
+  #graphPane{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column}
+  #graphHead{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);font-size:13px;color:var(--muted)}
+  #treeWrap{flex:1;min-height:0;overflow:auto;padding:8px 10px}
+  .ftree,.ftree ul{list-style:none;margin:0;padding:0}
+  .ftree ul{padding-left:16px;margin-left:9px;border-left:1px solid var(--line)}
+  .frow{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:6px;cursor:pointer;font-size:12.5px;white-space:nowrap;user-select:none}
+  .frow:hover{background:var(--panel-2)}
+  .frow.sel{background:var(--panel-2);outline:1px solid var(--accent)}
+  .frow .tw{width:13px;flex:none;color:var(--muted);font-size:10px;text-align:center}
+  .frow .ic{flex:none;font-size:11px}
+  .frow.k-root .ic,.frow.k-neighbor-bitmap .ic{color:var(--accent)}
+  .frow.k-reinscription .ic{color:var(--rein)}
+  .frow.dir-up .ic{color:var(--neighbor)}
+  .frow.dir-up .lbl{color:var(--neighbor)}
+  .frow.k-parent .lbl,.frow.k-neighbor-bitmap .lbl{color:var(--neighbor)}
+  /* fixed-width slots so the badges align in COLUMNS across every row/depth;
+     the label GROUP (number + delegate icon) is the flexible element — it
+     grows to fill and truncates the label when deep, so the right-side
+     columns anchor at the same X regardless of indentation */
+  .frow .lgroup{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:5px;overflow:hidden}
+  .frow .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frow .dlg{flex:none;color:var(--rein);font-size:11px}
+  .frow .fdate{width:66px;text-align:center;color:var(--muted);font-size:10px;flex:none}
+  .frow .chip{width:88px;text-align:center;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:10px;border:1px solid var(--line);border-radius:4px;padding:0 4px;flex:none}
+  .frow .cnt{width:58px;text-align:center;color:var(--muted);font-size:10px;border:1px solid var(--line);border-radius:4px;padding:0 4px;flex:none}
+  .frow .pbadge{width:34px;text-align:center;color:var(--neighbor);font-size:10px;border:1px solid var(--neighbor);border-radius:4px;padding:0 4px;flex:none}
+  .frow .endpad{width:56px;flex:none}
+  .frow .own{flex:none;width:15px;height:15px;border-radius:50%;background:var(--ok);color:#06230f;font-size:9.5px;font-weight:800;display:grid;place-items:center}
+  .frow .off{visibility:hidden}
+  .fstub{color:var(--muted);font-size:11px;padding:2px 6px 2px 20px;font-style:italic}
+  .fsep{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin:10px 0 4px;padding:4px 6px;border-top:1px dashed var(--line)}
+  /* draggable split between the tree and the content viewer */
+  #splitBar{height:8px;flex:none;cursor:ns-resize;background:var(--panel);border-top:1px solid var(--line);position:relative;touch-action:none}
+  #splitBar::after{content:"";position:absolute;left:50%;top:2px;transform:translateX(-50%);width:46px;height:3px;border-radius:2px;background:var(--line)}
+  #splitBar:hover::after,#splitBar.drag::after{background:var(--accent)}
+  #previewBar{display:flex;gap:6px;align-items:center;padding:6px 10px;border-top:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--muted);min-height:38px;flex-wrap:wrap}
+  #previewBar b{color:var(--ink)}
+  #previewBox{height:240px;flex:none;border-top:1px solid var(--line);background:#0a0d12}
+  /* captured text inscriptions render in-theme (white on dark) — a
+     cross-origin iframe's text can't be restyled */
+  #prevText{margin:0;width:100%;height:100%;overflow:auto;padding:12px;background:#0a0d12;color:var(--ink);font:12.5px/1.55 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+  #previewBox iframe{width:100%;height:100%;border:0;display:block;background:#fff}
+  #prevMeta{width:100%;height:100%;overflow:auto;padding:10px 12px;background:#0a0d12}
+  #prevMeta table{width:100%;border-collapse:collapse;font-size:12px}
+  #prevMeta td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
+  #prevMeta td.k{color:var(--muted);width:120px;white-space:nowrap}
+  #prevMeta td.v{color:var(--ink)}
+  #prevMeta td.v a{color:var(--neighbor)}
+  #prevMeta .yes{color:var(--ok)}
+  .ptab{background:var(--panel-2);border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:3px 9px;font-size:11.5px;cursor:pointer}
+  .ptab.on{border-color:var(--accent);color:var(--accent)}
+  .howto{margin:6px 0 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);padding:6px 10px}
+  .howto summary{cursor:pointer;color:var(--accent);font-size:12.5px;user-select:none}
+  .howto ol{margin:8px 0 2px;padding-left:18px}
+  .howto li{color:var(--muted);font-size:12px;line-height:1.45;margin:5px 0}
+  .howto b{color:var(--ink);font-weight:600}
+  /* chat availability line */
+  #chatStatus{display:none;gap:8px;align-items:center;padding:5px 14px;border-top:1px solid var(--line);background:var(--panel);font-size:11.5px;color:var(--muted)}
+  #chatStatus.on{display:flex}
+  #chatStatus b{color:var(--ink);font-weight:600}
+  #chatStatus .free{color:var(--ok)}
+  #chatStatus .link{color:var(--accent);cursor:pointer;text-decoration:underline}
+  /* settings: two columns — API key | questions */
+  .setCols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+  @media (max-width:900px){ .setCols{grid-template-columns:1fr} }
+  .scol{border:1px solid var(--line);background:var(--panel-2);border-radius:10px;padding:14px 16px;min-width:0}
+  .scol.active{border-color:var(--accent);box-shadow:inset 0 0 0 1px rgba(227,179,65,.25)}
+  .scolHead{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .scolHead h4{margin:0;font-size:12.5px;color:var(--ink);text-transform:none;letter-spacing:0}
+  .modeBtn{margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:2px 10px;font-size:11px;cursor:pointer}
+  .modeBtn:hover{border-color:var(--accent);color:var(--accent)}
+  .modeBtn.on{background:var(--accent);border-color:var(--accent);color:#151515;font-weight:700}
+  .modeBtn.on::before{content:"✓ "}
+  a.btn{display:inline-block;text-decoration:none;line-height:normal}
+  #getKeyLink{margin-left:auto;border-color:var(--neighbor);color:var(--neighbor)}
+  #getKeyLink:hover{border-color:var(--accent);color:var(--accent)}
+  /* ID-scoped: #settingsPanel input (further down) would otherwise outrank these */
+  #settingsPanel .scol select,#settingsPanel .scol input{width:100%;background:var(--paper);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 9px;font-size:12.5px;margin:2px 0}
+  .qbal{display:flex;align-items:baseline;gap:5px;margin:2px 0 10px}
+  .qbal #qBalBig{font-size:26px;font-weight:800;color:var(--accent);line-height:1}
+  .freeTag{margin-left:auto;color:var(--ok);font-size:11px;border:1px solid var(--ok);border-radius:999px;padding:1px 8px}
+  .freeTag.off{color:var(--muted);border-color:var(--line)}
+  .packs{display:flex;gap:6px;flex-wrap:wrap}
+  .packBtn{flex:1;min-width:64px;background:var(--paper);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 4px;font-size:12px;cursor:pointer;text-align:center;line-height:1.25}
+  .packBtn small{display:block;color:var(--muted);font-size:10px}
+  .packBtn:hover{border-color:var(--accent)}
+  .packBtn.on{border-color:var(--accent);background:rgba(227,179,65,.12)}
+  /* fee picker — tier cards + log slider (unisat-style) */
+  .feeCards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
+  .feeCard{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:9px 6px;cursor:pointer;text-align:center;line-height:1.3;transition:border-color .12s,background .12s}
+  .feeCard .ft{display:block;font-size:12.5px;font-weight:600}
+  .feeCard .fv{display:block;font-size:13px;font-weight:700;color:var(--ink);margin-top:2px}
+  .feeCard .fv small{font-weight:400;color:var(--muted);font-size:10.5px}
+  .feeCard.eco .ft{color:var(--ok)}
+  .feeCard.norm .ft{color:var(--accent)}
+  .feeCard.fast .ft{color:#f0883e}
+  .feeCard:hover{border-color:var(--muted)}
+  .feeCard.on{background:rgba(227,179,65,.08);border-color:var(--accent)}
+  .feeCard.eco.on{background:rgba(63,185,80,.08);border-color:var(--ok)}
+  .feeCard.fast.on{background:rgba(240,136,62,.08);border-color:#f0883e}
+  .feeSlideWrap{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:12px 14px 8px;background:var(--paper)}
+  .feeSlide{flex:1;min-width:0;position:relative;padding-bottom:16px}
+  #feeRange{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:3px;background:var(--line);outline:none;margin:6px 0 0;cursor:pointer}
+  #feeRange::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);border:0;cursor:grab;box-shadow:0 0 0 3px rgba(227,179,65,.2)}
+  #feeRange::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:0;cursor:grab}
+  .feeTicks{position:absolute;left:0;right:0;top:16px;height:16px}
+  .feeTicks span{position:absolute;transform:translateX(-50%);font-size:10px;color:var(--muted);cursor:pointer;user-select:none}
+  .feeTicks span::before{content:"";position:absolute;left:50%;top:-8px;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--line)}
+  .feeTicks span:hover,.feeTicks span.past{color:var(--ink)}
+  .feeTicks span.past::before{background:var(--accent)}
+  #settingsPanel .feeSlideWrap input[type=number]{width:74px;flex:none;text-align:center;font-weight:600;margin:0;padding:7px 4px}
+  #settingsPanel #feeRange{width:100%;padding:0;margin:6px 0 0;border:0;border-radius:3px}
+  .quoteBox{margin:8px 0;padding:8px 10px;border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--muted);text-align:center}
+  .quoteBox b{color:var(--ink)}
+  .quoteBox .disc{color:var(--ok)}
+  .quoteBox .warn{color:var(--accent)}
+  /* orders modal */
+  #ordersWrap{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:55}
+  #ordersWrap.on{display:flex}
+  #ordersPanel{position:relative;width:min(720px,95vw);max-height:88vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:0 12px 40px #000c}
+  #ordersPanel h3{margin:0 0 10px;font-size:14px;color:var(--accent)}
+  .oSummary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  @media (max-width:620px){ .oSummary{grid-template-columns:repeat(2,1fr)} }
+  .oCard{border:1px solid var(--line);background:var(--panel-2);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;justify-content:center}
+  .oCard .big{font-size:20px;font-weight:800;color:var(--accent);line-height:1.1}
+  .oCard .dim{color:var(--muted);font-size:11px}
+  .otable{width:100%;border-collapse:collapse;font-size:12px}
+  .otable th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;padding:4px 6px;border-bottom:1px solid var(--line)}
+  .otable td{padding:6px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .otable a{color:var(--neighbor)}
+  .ost{font-size:10.5px;border-radius:999px;padding:1px 8px;border:1px solid var(--line);white-space:nowrap}
+  .ost.confirmed{color:var(--ok);border-color:var(--ok)}
+  .ost.pending{color:var(--accent);border-color:var(--accent)}
+  .ost.awaiting_payment{color:var(--muted)}
+  .ost.underpaid,.ost.expired{color:var(--bad);border-color:var(--bad)}
+  .oEmpty{color:var(--muted);font-size:12.5px;text-align:center;padding:18px}
+  .opager{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:10px;color:var(--muted);font-size:12px}
+  .opager .btn{min-width:30px}
+  #legend{display:flex;gap:12px;padding:5px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:11.5px;flex-wrap:wrap}
+  #legend b{font-weight:600}
+  /* settings + usage modals */
+  #settingsWrap,#usageWrap{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:50}
+  #settingsWrap.on,#usageWrap.on{display:flex}
+  #settingsPanel,#usagePanel{position:relative;width:min(460px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:0 12px 40px #000c}
+  /* settings is the two-column panel (API key | questions) — much wider */
+  #settingsPanel{width:min(1120px,96vw);max-height:92vh;overflow-y:auto;padding:18px 22px}
+  #settingsPanel h3,#usagePanel h3{margin:0 0 8px;font-size:14px;color:var(--accent)}
+  #settingsPanel input{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px ui-monospace,Consolas,monospace;margin:6px 0}
+  #settingsPanel select{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:13px;margin:4px 0 2px}
+  #settingsPanel .row,#usagePanel .row{display:flex;gap:8px;margin:8px 0}
+  #settingsPanel .dim,#usagePanel .dim{color:var(--muted);font-size:12.5px;margin:4px 0}
+  #settingsPanel .small,#usagePanel .small{font-size:11.5px;line-height:1.4}
+  /* usage ring icon + popup bar */
+  #usageRing{display:block;width:15px;height:15px;border-radius:50%;position:relative;background:conic-gradient(var(--accent) calc(var(--p,0)*1%),var(--panel-2) 0)}
+  #usageRing::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--panel)}
+  .ubar{height:10px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden;margin:6px 0 4px}
+  .ubar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--accent));transition:width .3s}
+  .ustats{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin:10px 0;font-size:12.5px;color:var(--muted)}
+  .ustats b{color:var(--ink);font-weight:600;float:right}
+  #settingsPanel .keyset{color:var(--ok);font-size:13px;margin:6px 0}
+  .btn.danger{border-color:var(--bad);color:var(--bad)}
+  /* green "configured" state for the header icons (⚙ / wallet address) */
+  .btn.setok{border-color:var(--ok);color:var(--ok)}
+  /* 📜 instructions panel: the three prompts, in priority order */
+  #promptWrap{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:52}
+  #promptWrap.on{display:flex}
+  #promptPanel{position:relative;width:min(820px,95vw);max-height:90vh;overflow-y:auto;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px #000c}
+  #promptPanel h3{margin:0 0 6px;font-size:14px;color:var(--accent)}
+  #promptPanel .dim{color:var(--muted);font-size:12.5px;margin:4px 0}
+  #promptPanel .small{font-size:11.5px;line-height:1.5}
+  #promptPanel .row{display:flex;gap:8px;align-items:center;margin-top:12px}
+  .pblock{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--panel-2)}
+  .pblock.mine{border-color:rgba(227,179,65,.45)}
+  .phead{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:7px}
+  .phead b{font-size:12.5px}
+  .prank{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+    background:var(--accent);color:#151515;font-size:11px;font-weight:800;flex:none}
+  .pblock.house .prank{background:var(--line);color:var(--muted)}
+  .ptag{color:var(--muted);font-size:11px}
+  .pcount{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .pcount.over{color:var(--bad)}
+  #promptPanel textarea{width:100%;min-height:88px;resize:vertical;background:var(--paper);border:1px solid var(--line);
+    border-radius:8px;color:var(--ink);padding:9px 11px;font:12.5px/1.6 ui-monospace,Consolas,monospace;outline:none}
+  #promptPanel textarea:focus{border-color:var(--accent)}
+  .plock{display:none;margin-top:7px;color:var(--muted);font-size:11.5px;line-height:1.45}
+  .plock.on{display:block}
+  .pblock.locked{border-color:var(--line);opacity:.85}
+  .pblock.locked textarea{opacity:.5;cursor:not-allowed}
+  .pblock.locked .prank{background:var(--line);color:var(--muted)}
+  .phouse{margin:0;max-height:210px;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:8px;
+    padding:9px 11px;color:var(--muted);font:12px/1.6 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+  /* wallet picker — one wide panel, 3 columns, no panel-level scrolling */
+  #pickerWrap{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:40}
+  #pickerWrap.on{display:flex}
+  #pickerPanel{position:relative;width:min(1180px,96vw);max-height:92vh;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:0 12px 40px #000c;display:flex;flex-direction:column}
+  .winClose{position:absolute;top:8px;right:8px;width:32px;height:30px;border:0;background:transparent;color:var(--muted);font-size:14px;border-radius:7px;cursor:pointer;line-height:1;z-index:2}
+  .winClose:hover{background:var(--bad);color:#fff}
+  .iconbtn{padding:3px 9px;font-size:13px;line-height:1.3;margin-left:6px}
+  #pickerPanel h3{margin:0 0 8px;font-size:14px;color:var(--accent)}
+  #pickerPanel h4{margin:0 0 6px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  #pickerPanel .addr{color:var(--muted);font-size:11.5px;word-break:break-all;font-weight:400;margin-left:8px}
+  .pickerCols{display:grid;grid-template-columns:1fr 2.2fr;gap:14px;min-height:0;flex:1}
+  @media (max-width:980px){ .pickerCols{grid-template-columns:1fr;overflow-y:auto} .gateGroup{grid-template-columns:1fr} }
+  .pcol{min-width:0;max-height:70vh;overflow-y:auto;display:flex;flex-direction:column}
+  /* the gate area: unlock field on top, then ONE visual group holding the
+     parcels + PathScribers + mint page (they belong together) */
+  .gateArea{min-width:0;min-height:0;max-height:70vh;display:flex;flex-direction:column}
+  .gateGroup{flex:1;min-height:0;display:grid;grid-template-columns:.72fr 1.4fr;gap:14px;border:1px solid var(--line);background:var(--panel-2);border-radius:10px;padding:12px;overflow:hidden}
+  .gcol{min-width:0;overflow-y:auto;display:flex;flex-direction:column}
+  /* the "scan any bitmap" privilege field — owned, not given */
+  .unlockBox{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:0 0 12px;padding:12px 16px;
+    border:1px solid rgba(227,179,65,.45);border-radius:14px;
+    background:radial-gradient(120% 200% at 0% 0%,rgba(227,179,65,.16),transparent 46%),linear-gradient(180deg,rgba(227,179,65,.06),rgba(227,179,65,.02));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 24px rgba(0,0,0,.35)}
+  .unlockBadge{width:36px;height:36px;flex:none;border-radius:11px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--accent),#a97a17);color:#151515;font-weight:800;font-size:17px;
+    box-shadow:0 4px 14px rgba(227,179,65,.35)}
+  .unlockText{flex:1;min-width:170px;line-height:1.3}
+  .unlockText b{display:block;font-size:13.5px}
+  .unlockText span{color:var(--muted);font-size:11.5px}
+  .unlockField{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;
+    background:var(--paper);padding:4px 4px 4px 14px;transition:border-color .15s,box-shadow .15s}
+  .unlockField:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(227,179,65,.18)}
+  .unlockField .hash{color:var(--muted);font-size:13px}
+  .unlockField input{border:0;background:transparent;width:110px;padding:6px 4px 6px 0;outline:none;font-size:14px;color:var(--ink)}
+  .unlockField input::-webkit-outer-spin-button,.unlockField input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .unlockField input[type=number]{-moz-appearance:textfield;appearance:textfield}
+  .unlockField .btn{border-radius:999px}
+  .lockBox{margin:0 0 12px;padding:12px 16px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);font-size:12.5px;line-height:1.4}
+  /* "I already minted one" — sits under the mint page */
+  .claimBox{margin-top:10px;padding:11px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2)}
+  .claimLead{color:var(--muted);font-size:11.5px;margin-bottom:7px}
+  .claimField{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;
+    background:var(--paper);padding:4px 4px 4px 14px;transition:border-color .15s,box-shadow .15s}
+  .claimField:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(227,179,65,.18)}
+  .claimField input{flex:1;min-width:0;border:0;background:transparent;padding:6px 4px 6px 0;outline:none;
+    font:12px ui-monospace,Consolas,monospace;color:var(--ink)}
+  .claimField .btn{border-radius:999px;flex:none}
+  .claimMsg{min-height:15px;font-size:11.5px;margin-top:6px;line-height:1.35}
+  .claimMsg.ok{color:var(--ok)} .claimMsg.err{color:var(--bad)} .claimMsg.busy{color:var(--muted)}
+  .bmList{display:flex;flex-direction:column;gap:8px}
+  .bmCard{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px}
+  .bmCard iframe{width:84px;height:84px;border:0;border-radius:6px;background:#0a0d12;flex:none;pointer-events:none}
+  .bmCard .btn{flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left}
+  .scanTag{color:var(--muted);font-size:10.5px;white-space:nowrap}
+  .bmCard .btn:hover .scanTag{color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chips .none{color:var(--muted);font-size:12.5px}
+  .chips button{font-family:ui-monospace,Consolas,monospace}
+  #pickerPanel .okmsg{color:var(--ok);font-size:13px;margin:10px 0 2px}
+  #pickerPanel .dimmsg{color:var(--muted);font-size:12.5px;margin:8px 0 2px;line-height:1.4}
+  #pickerPanel .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+  #pickerPanel input[type=number]{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 10px;width:150px}
+  /* mint page: full desktop layout scaled to the column width (no horizontal
+     scroll). The whole preview is a link (click anywhere -> new tab); vertical
+     scrolling happens on the wrapper. */
+  .marketWrap{height:340px;flex:none;overflow-y:auto;overflow-x:hidden;border:1px solid var(--line);border-radius:8px;background:#000}
+  .marketClick{display:block;cursor:pointer}
+  .marketScaled{position:relative;overflow:hidden}
+  .marketScaled iframe{border:0;transform-origin:0 0;display:block;pointer-events:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>◼ Bitmap Chat</h1>
+  <input id="bmInput" type="number" min="0" max="941999" placeholder="bitmap #">
+  <button id="imgToggle" class="btn iconbtn" title="">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none"/>
+      <path d="M21 15l-5-5L5 21"/>
+      <line class="slash" x1="3" y1="3" x2="21" y2="21"/>
+    </svg>
+  </button>
+  <button id="exploreBtn" class="btn primary">Explore</button>
+  <span id="crawlInfo" style="color:var(--muted);font-size:12.5px"></span>
+  <span style="flex:1"></span>
+  <button id="promptBtn" class="btn iconbtn" title="How the AI is instructed — read it, and add your own">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6.5 2.5h11a2 2 0 0 1 2 2v13.5a3 3 0 0 1-3 3H6a3 3 0 0 0 3-3V4.5a2 2 0 0 0-2-2z"/>
+      <path d="M6.5 2.5A2 2 0 0 0 4.5 4.5v2.2h4.5"/>
+      <path d="M11.5 7h5M11.5 10.5h5M11.5 14h3"/>
+    </svg>
+  </button>
+  <button id="walletBtn" class="btn">Connect wallet</button>
+  <button id="ordersBtn" class="btn" title="Your orders and questions">Orders</button>
+  <button id="settingsBtn" class="btn" title="Settings — API key, questions, model">⚙</button>
+</header>
+<div id="usageWrap">
+  <div id="usagePanel">
+    <button id="closeUsageBtn" class="winClose" title="Close">✕</button>
+    <h3>Token usage</h3>
+    <p class="dim" id="ctxBarLabel">No answers yet — the bar fills as you chat.</p>
+    <div class="ubar"><i id="ctxBarFill"></i></div>
+    <div id="usageStats" class="ustats"></div>
+    <p class="dim small">Anthropic's API doesn't let a key query its own balance or total spend, so these totals are tracked locally in this browser. Cost is an estimate at list prices (cache reads bill 0.1× input, cache writes 1.25×).</p>
+    <div class="row"><span style="flex:1"></span><button id="resetUsageBtn" class="btn small">Reset totals</button></div>
+  </div>
+</div>
+<div id="promptWrap">
+  <div id="promptPanel">
+    <button id="closePromptBtn" class="winClose" title="Close">✕</button>
+    <h3>How the AI is instructed</h3>
+    <p class="dim small">Every question is asked with these instructions, in this order. <b>Whatever is higher up wins</b> if two of them disagree — so your own instructions at the top outrank the app's, and your notes at the bottom count least. Yours are kept in this browser only.</p>
+
+    <div class="pblock mine">
+      <div class="phead"><span class="prank">1</span><b>Your instructions</b><span class="ptag">highest priority</span><span style="flex:1"></span><span class="pcount" id="aboveCount"></span></div>
+      <textarea id="promptAbove" spellcheck="false" placeholder="e.g. Answer in Greek. Always start with a one-line summary."></textarea>
+      <div class="plock" id="lockAbove"></div>
+    </div>
+
+    <div class="pblock house" id="blockMain">
+      <div class="phead"><span class="prank">2</span><b>The app's instructions</b><span class="ptag" id="mainTag">read-only</span><span style="flex:1"></span>
+        <button id="mainReset" class="btn small" style="display:none">Back to the app's</button><span class="pcount" id="houseCount"></span></div>
+      <pre id="housePrompt" class="phouse">loading…</pre>
+      <textarea id="promptMain" spellcheck="false" style="display:none;min-height:190px"></textarea>
+      <div class="plock" id="lockMain"></div>
+    </div>
+
+    <div class="pblock mine">
+      <div class="phead"><span class="prank">3</span><b>Your extra notes</b><span class="ptag">lowest priority</span><span style="flex:1"></span><span class="pcount" id="belowCount"></span></div>
+      <textarea id="promptBelow" spellcheck="false" placeholder="e.g. Keep answers under 150 words unless I ask for more."></textarea>
+      <div class="plock" id="lockBelow"></div>
+    </div>
+
+    <div class="row"><span class="dim small" id="promptSaved">Saved as you type.</span><span style="flex:1"></span><button id="promptClear" class="btn small danger">Clear mine</button></div>
+  </div>
+</div>
+<div id="pickerWrap">
+  <div id="pickerPanel">
+    <button id="closePickerBtn" class="winClose" title="Close">✕</button>
+    <h3>Your wallet <span class="addr" id="pickerAddr"></span> <button id="rescanBtn" class="btn small iconbtn" title="Re-check wallet (after minting or buying)">↻</button></h3>
+    <div class="pickerCols">
+      <div class="pcol">
+        <h4>Your bitmaps</h4>
+        <div id="pickerBitmaps" class="bmList"></div>
+      </div>
+      <div class="gateArea">
+        <div id="pickerGate"></div>
+        <div class="gateGroup">
+          <div class="gcol">
+            <h4 id="pickerParcelsTitle">Your parcels</h4>
+            <div class="chips" id="pickerParcels"></div>
+          </div>
+          <div class="gcol">
+            <h4>Your PathScribers</h4>
+            <div class="chips" id="pickerScribers"></div>
+            <h4 style="margin-top:12px">Mint page</h4>
+            <div id="pickerMarket"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <span style="flex:1"></span>
+      <button id="disconnectBtn" class="btn small danger">Disconnect</button>
+    </div>
+  </div>
+</div>
+<div id="settingsWrap">
+  <div id="settingsPanel">
+    <h3>Settings — Anthropic API key</h3>
+    <details class="howto">
+      <summary>How access works</summary>
+      <ol>
+        <li><b>Connect your wallet</b> and sign one free message — this proves which addresses you own (nothing on-chain, no cost).</li>
+        <li><b>Which bitmaps you can scan:</b> any bitmap while you have a question available (the free daily one counts). Otherwise the ones your wallet holds — or <b>any</b> bitmap, always, with a <b>PathScriber</b> / 114588 parcel.</li>
+        <li><b>Asking the AI —</b> pick one below: <b>Questions</b> (1 free every day, <b>+1 more per PathScriber and per 114588 parcel you hold</b>, then buy packs with BTC) or <b>your own API key</b> (unlimited, your choice of model and context size).</li>
+      </ol>
+    </details>
+    <p class="dim small" id="quotaLine"></p>
+
+    <div class="setCols">
+      <!-- LEFT: bring your own API key -->
+      <div class="scol">
+        <div class="scolHead">
+          <h4>Your API key</h4>
+          <button class="modeBtn" id="modeKeyBtn" data-mode="key">use this</button>
+        </div>
+        <p id="keyStatus" class="dim">…</p>
+        <input id="keyInput" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+        <div class="row">
+          <button id="saveKeyBtn" class="btn primary small">Save</button>
+          <button id="clearKeyBtn" class="btn danger small">Delete key</button>
+          <a id="getKeyLink" class="btn small" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer"
+             title="Opens the Anthropic Console in a new tab — create a key, then paste it here">Get an API key ↗</a>
+        </div>
+        <p class="dim" style="margin-top:10px">Model</p>
+        <select id="modelSel">
+          <option value="claude-opus-5">Claude Opus 5 — smartest · $5 / $25 per MTok</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 — fast &amp; balanced · $3 / $15</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 — cheapest · $1 / $5 · 200k window</option>
+        </select>
+        <p class="dim" style="margin-top:10px">Context size</p>
+        <select id="ctxSel">
+          <option value="100000">100k tokens — light</option>
+          <option value="200000">200k tokens (default)</option>
+          <option value="500000">500k tokens — needs your own key</option>
+          <option value="1000000">1M tokens (full window) — needs your own key</option>
+        </select>
+        <p class="dim small">Stored only in this browser. Unlimited questions — you pay Anthropic directly (add credit in the Console, then create a key).</p>
+      </div>
+
+      <!-- RIGHT: buy questions with BTC -->
+      <div class="scol">
+        <div class="scolHead">
+          <h4>Questions</h4>
+          <button class="modeBtn" id="modeQBtn" data-mode="questions">use this</button>
+        </div>
+        <div class="qbal"><span id="qBalBig">0</span><span class="dim"> questions</span><span id="qFreeTag" class="freeTag">+1 free today</span></div>
+        <p class="dim">Buy questions</p>
+        <div class="packs" id="packRow"></div>
+        <input id="promoInput" placeholder="promo code (optional)" autocomplete="off" spellcheck="false">
+        <p class="dim" style="margin-top:8px">Select the network fee you want to pay</p>
+        <div class="feeCards" id="feeRow"></div>
+        <div class="feeSlideWrap">
+          <div class="feeSlide">
+            <input id="feeRange" type="range" min="0" max="100" step="1" aria-label="network fee">
+            <div class="feeTicks" id="feeTicks"></div>
+          </div>
+          <input id="feeCustom" type="number" min="1" max="2000" step="1" aria-label="fee in sat/vB">
+        </div>
+        <div id="quoteBox" class="quoteBox">pick a pack</div>
+        <button id="buyBtn" class="btn primary" disabled>Connect wallet to buy</button>
+        <p class="dim small">You pay from your own wallet. Questions arrive when the payment confirms — track it in <b>Orders</b>.</p>
+      </div>
+    </div>
+    <div class="row"><span style="flex:1"></span><button id="closeSettingsBtn" class="btn small">Close</button></div>
+  </div>
+</div>
+<div id="ordersWrap">
+  <div id="ordersPanel">
+    <button id="closeOrdersBtn" class="winClose" title="Close">✕</button>
+    <h3>Orders <span class="addr" id="ordersAddr"></span> <button id="ordersRefresh" class="btn small iconbtn" title="Re-check payments">↻</button></h3>
+    <div class="oSummary">
+      <div class="oCard"><span class="big" id="oBal">0</span><span class="dim">questions available</span></div>
+      <div class="oCard" title="1 free question a day, +1 for each PathScriber and 114588 parcel you hold"><span class="big" id="oFree">–</span><span class="dim">free question today</span></div>
+      <div class="oCard"><span class="big" id="oMode">–</span><span class="dim">currently using</span></div>
+      <div class="oCard"><button id="oBuyBtn" class="btn small primary">Buy questions</button></div>
+    </div>
+    <div id="ordersList"></div>
+  </div>
+</div>
+<div id="progress"><span id="progText">…</span><div class="bar"><i></i></div></div>
+<main>
+  <section id="chatPane">
+    <div id="msgs"><div class="note">Enter a bitmap number and press Explore.<br>The app reads the whole on-chain family via the ordinals.com recursive API, then Claude answers questions about it.</div></div>
+    <div id="chatStatus"></div>
+    <div id="composer">
+      <textarea id="chatInput" placeholder="Ask about this bitmap… (Enter to send, Shift+Enter for a new line)" disabled></textarea>
+      <div class="col">
+        <div style="display:flex;gap:6px">
+          <button id="sendBtn" class="btn primary" disabled style="flex:1">Send</button>
+          <button id="shareBtn" class="btn small" disabled title="Copy the last question &amp; answer as a shareable image">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>
+          </button>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button id="usageBtn" class="btn small iconbtn" title="Token usage"><span id="usageRing"></span></button>
+          <button id="newChatBtn" class="btn small" disabled style="flex:1">New chat</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="graphPane">
+    <div id="graphHead"><span id="graphTitle">Family explorer</span><span style="flex:1"></span></div>
+    <div id="treeWrap"><ul id="fileTree" class="ftree"></ul></div>
+    <div id="splitBar" title="drag to resize the tree / content viewer"></div>
+    <div id="previewBar">
+      <span id="prevLabel">click an inscription to preview it here</span>
+      <span style="flex:1"></span>
+      <span id="prevTabs" style="display:none">
+        <button id="tabContent" class="ptab on">Content</button>
+        <button id="tabMeta" class="ptab">Metadata</button>
+      </span>
+      <button id="prevCopy" class="btn small" style="display:none">copy id</button>
+      <a id="prevLink" class="btn small" target="_blank" rel="noopener" style="display:none">ordinals.com ↗</a>
+      <button id="prevAsk" class="btn small" style="display:none">Ask about this</button>
+    </div>
+    <div id="previewBox">
+      <pre id="prevText" style="display:none"></pre>
+      <iframe id="prevFrame" sandbox="allow-scripts" loading="lazy" referrerpolicy="no-referrer"></iframe>
+      <div id="prevMeta" style="display:none"></div>
+    </div>
+    <div id="legend">
+      <span><b style="color:var(--accent)">▣</b> bitmap</span>
+      <span><b>▢</b> child / parcel</span>
+      <span><b style="color:var(--rein)">↻</b> reinscription</span>
+      <span><b style="color:var(--neighbor)">⬆</b> parent (climbs upward)</span>
+      <span><b style="color:var(--ok)">✓</b> owned by your wallet</span>
+      <span>click = preview · expand = children</span>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import { marked } from "https://esm.sh/marked@12";
+import DOMPurify from "https://esm.sh/dompurify@3";
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+import { request as walletRequest } from "https://esm.sh/sats-connect@3"; // same wallet-connect flow as btcmail
+
+// htmlLabels:false renders labels as plain SVG <text> — HTML-in-foreignObject
+// labels get stripped by sanitization, leaving empty boxes. BOTH the top-level
+// and the flowchart-scoped key are required: this mermaid build reads the
+// top-level one for "graph TD" diagrams.
+mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "dark", htmlLabels: false, flowchart: { htmlLabels: false } });
+marked.setOptions({ gfm: true, breaks: true });
+
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  if (node.tagName === "A") {
+    const href = node.getAttribute("href") || "";
+    if (!/^https?:\/\//i.test(href)) node.removeAttribute("href");
+    node.setAttribute("target", "_blank");
+    node.setAttribute("rel", "noopener noreferrer");
+  }
+});
+const MD_ALLOWED = {
+  ALLOWED_TAGS: ["p","br","strong","em","del","code","pre","ul","ol","li","h1","h2","h3","h4","table","thead","tbody","tr","th","td","blockquote","a","span","hr"],
+  ALLOWED_ATTR: ["href","class"],
+};
+
+const $ = (id) => document.getElementById(id);
+const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const short = (id) => String(id).slice(0, 12);
+
+const state = {
+  bitmap: null, images: true, imagesOn: true, ready: false, crawling: false,
+  graph: null, history: [], streaming: false, chatGen: 0,
+  expanded: new Set(), selected: null,
+  wallet: null, // { address, bitmaps[], parcels[], pathscribers[], unlocked, gateBitmap }
+  balance: { questions: 0, freeLeft: 0, freeAllowance: 1 }, // bought + free-today
+  token: null,  // BIP-322 session token — the server trusts ONLY this address
+  cfg: null,    // /api/config: { walletGate, gateBitmap, marketUrl, serverHasKey, ... }
+};
+
+// ---------------------------------------------------------------------------
+// API helpers (fetch-based SSE so we can POST and send the access-code header)
+// ---------------------------------------------------------------------------
+const apiHeaders = (extra = {}) => {
+  const h = { ...extra };
+  if (state.token) h["Authorization"] = `Bearer ${state.token}`;
+  return h;
+};
+
+// ---------------------------------------------------------------------------
+// 📜 Instructions: the app's prompt (read-only) wrapped in the reader's own.
+// Priority is the reading order — above > the app's > below — and the server
+// tells the model exactly that. Kept in this browser, like the API key.
+// ---------------------------------------------------------------------------
+// Each slot is earned: a PathScriber opens the top one, a gate-bitmap parcel
+// the bottom one, and holding both opens the middle — your own copy of the
+// app's prompt. The server enforces all of it; this is only the UI side.
+let USER_PROMPT_MAX = 4000, USER_MAIN_MAX = 12000; // real caps arrive with /api/prompt
+let promptRights = { above: false, below: false, main: false };
+let housePromptText = null;
+
+const SLOT_MAX = () => ({ above: USER_PROMPT_MAX, below: USER_PROMPT_MAX, main: USER_MAIN_MAX });
+const slotId = (s) => `prompt${s[0].toUpperCase()}${s.slice(1)}`;
+const getPrompt = (slot) => (localStorage.getItem(`bac_prompt_${slot}`) || "").slice(0, SLOT_MAX()[slot]);
+
+// only slots this wallet may actually use are sent — a stale localStorage entry
+// from when they held a PathScriber must not 403 every question
+const userPrompts = () => {
+  const out = {};
+  for (const slot of ["above", "below", "main"]) {
+    const v = getPrompt(slot).trim();
+    if (v && promptRights[slot]) out[`prompt${slot[0].toUpperCase()}${slot.slice(1)}`] = v;
+  }
+  return out;
+};
+const hasUserPrompt = () => Object.keys(userPrompts()).length > 0;
+
+function markPromptBtn() {
+  // green, like ⚙ and the wallet, when the reader's own instructions are live
+  $("promptBtn").classList.toggle("setok", hasUserPrompt());
+  $("promptBtn").title = hasUserPrompt()
+    ? "Your own instructions are active — click to read or change them"
+    : "How the AI is instructed — read it, and add your own";
+}
+
+function countPrompts() {
+  const max = SLOT_MAX();
+  for (const [slot, el] of [["above", "aboveCount"], ["below", "belowCount"]]) {
+    const n = $(slotId(slot)).value.length;
+    $(el).textContent = `${n.toLocaleString("en-US")} / ${max[slot].toLocaleString("en-US")}`;
+    $(el).classList.toggle("over", n > max[slot]);
+  }
+  $("houseCount").textContent = promptRights.main
+    ? `${$("promptMain").value.length.toLocaleString("en-US")} / ${USER_MAIN_MAX.toLocaleString("en-US")}`
+    : housePromptText ? `${housePromptText.length.toLocaleString("en-US")} characters` : "";
+}
+
+// lock/unlock the three blocks for what this wallet holds
+function paintPromptRights() {
+  const gate = gateNum();
+  const why = {
+    above: `Hold a <b>PathScriber</b> to write the top instructions.`,
+    below: `Hold a <b>${gate}.bitmap parcel</b> to write the bottom notes.`,
+    main: `Hold <b>both a PathScriber and a ${gate}.bitmap parcel</b> to rewrite the app's own instructions for your questions.`,
+  };
+  const note = state.wallet ? "" : " Connect your wallet first.";
+  for (const slot of ["above", "below"]) {
+    const may = !!promptRights[slot];
+    $(slotId(slot)).disabled = !may;
+    $(slotId(slot)).closest(".pblock").classList.toggle("locked", !may);
+    $(`lock${slot[0].toUpperCase()}${slot.slice(1)}`).innerHTML = may ? "" : why[slot] + note;
+    $(`lock${slot[0].toUpperCase()}${slot.slice(1)}`).classList.toggle("on", !may);
+  }
+  // the middle: read-only <pre> for everyone, a textarea for dual holders
+  const mainOk = !!promptRights.main;
+  $("blockMain").classList.toggle("locked", !mainOk);
+  $("housePrompt").style.display = mainOk ? "none" : "";
+  $("promptMain").style.display = mainOk ? "" : "none";
+  $("mainReset").style.display = mainOk ? "" : "none";
+  $("mainTag").textContent = mainOk ? "yours to rewrite" : "read-only";
+  $("lockMain").innerHTML = mainOk ? "" : why.main + note;
+  $("lockMain").classList.toggle("on", !mainOk);
+}
+
+async function loadPromptInfo() {
+  try {
+    const d = await (await apiFetch("/api/prompt")).json();
+    housePromptText = d.text || "";
+    if (d.userMax > 0) USER_PROMPT_MAX = d.userMax;   // never accept more than the server takes
+    if (d.mainMax > 0) USER_MAIN_MAX = d.mainMax;
+    promptRights = d.rights || promptRights;
+  } catch { housePromptText = housePromptText ?? ""; }
+}
+
+async function openPrompts() {
+  $("promptAbove").value = getPrompt("above");
+  $("promptBelow").value = getPrompt("below");
+  $("promptWrap").classList.add("on");
+  await loadPromptInfo();                              // rights follow the wallet, so re-read on open
+  $("housePrompt").textContent = housePromptText || "(could not load the app's instructions — they are still used)";
+  $("promptMain").value = getPrompt("main") || housePromptText;
+  paintPromptRights();
+  countPrompts();
+  markPromptBtn();
+}
+const closePrompts = () => $("promptWrap").classList.remove("on");
+
+function savePrompt(slot) {
+  if (!promptRights[slot]) return;                     // locked slots never write
+  let v = $(slotId(slot)).value.slice(0, SLOT_MAX()[slot]);
+  // storing the app's own text as a "custom" middle prompt would be noise
+  if (slot === "main" && v.trim() === (housePromptText || "").trim()) v = "";
+  localStorage.setItem(`bac_prompt_${slot}`, v);
+  countPrompts();
+  markPromptBtn();
+  $("promptSaved").textContent = hasUserPrompt() ? "Saved — used from your next question." : "Saved as you type.";
+}
+
+// BYOK: the visitor's own Anthropic key, kept in this browser only.
+const getUserKey = () => (localStorage.getItem("bac_anthropic_key") || "").trim();
+const maskKey = (k) => (k.length > 16 ? `${k.slice(0, 10)}…${k.slice(-4)}` : "(set)");
+
+// A question credit (today's free question, or a bought one) is full access:
+// any bitmap, even from a wallet that holds none.
+const hasCredit = () => state.balance.freeLeft > 0 || state.balance.questions > 0;
+const ownsBitmap = (n) => (state.wallet?.bitmaps || []).some((b) => (typeof b === "number" ? b : b.n) === Number(n));
+
+// Exactly ONE billing mode is active: your own API key, or questions
+// (free daily + the ones you bought). Defaults to key when a key exists.
+const getMode = () => localStorage.getItem("bac_mode") || (getUserKey() ? "key" : "questions");
+const useKeyMode = () => getMode() === "key" && !!getUserKey();
+function setMode(m) {
+  localStorage.setItem("bac_mode", m);
+  refreshKeyStatus();
+  updateWalletUi();
+}
+
+// A stale/invalid wallet session must never look "connected" — reset the UI.
+function dropWalletSession(msg) {
+  state.token = null; state.wallet = null;
+  promptRights = { above: false, below: false, main: false }; // earned by holdings
+  saveSession(); updateWalletUi(); setControls(); markPromptBtn();
+  if (msg) setMsgsNote(`${escapeHtml(msg)}<br><br>${walletHintHtml()}`);
+}
+
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, { ...opts, headers: apiHeaders(opts.headers || {}) });
+  if (res.status === 401 || res.status === 403) {
+    const err = (await res.clone().json().catch(() => ({}))).error || "";
+    if (state.token && /session expired|sign in/i.test(err)) {
+      // the server no longer accepts our token (expired, or its secret
+      // changed) — without this the UI shows a green wallet that every
+      // request refuses ("stuck")
+      dropWalletSession("Your wallet session expired — please connect again.");
+    }
+  }
+  return res;
+}
+
+async function readSse(res, onEvent) {
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
+      let event = "message", data = "";
+      for (const line of chunk.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) data += line.slice(5).trim();
+      }
+      if (data) { try { onEvent(event, JSON.parse(data)); } catch {} }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Crawl flow
+// ---------------------------------------------------------------------------
+const PHASE_LABEL = {
+  starting: "starting", resolve: "resolving the canonical bitmap inscription",
+  children: "crawling children (all depths)", parents: "checking parents & neighbor districts",
+  reinscriptions: "scanning sats for reinscriptions", content: "reading inscription content",
+  images: "fetching images for the AI", done: "done",
+};
+
+async function explore() {
+  if (state.crawling) return; // re-entrancy guard: Enter in the input bypasses the disabled button
+  const n = Number($("bmInput").value);
+  if (!Number.isInteger(n) || n < 0 || n > maxBm()) { alert(`Enter a bitmap number between 0 and ${maxBmText()} — that is how far the on-chain index reaches.`); return; }
+  if (state.cfg?.walletGate) {
+    // no auto-popup: show the hint and let the user click "Connect wallet"
+    if (!state.wallet) { setMsgsNote(walletHintHtml()); return; }
+    // a question credit (today's free one, or bought) opens ANY bitmap
+    if (!state.wallet.unlocked && !hasCredit() && !ownsBitmap(n)) { openPicker(); return; }
+  }
+  const images = state.imagesOn;
+  if (state.bitmap !== null && (state.bitmap !== n || state.images !== images) && state.history.length) {
+    // switching districts — the old conversation must not leak into the new context
+    state.history = [];
+    state.chatGen++;
+    setMsgsNote("Switched bitmap — new chat.");
+  }
+  state.bitmap = n;
+  state.images = images;
+  state.crawling = true; state.ready = false;
+  setControls();
+  const prog = $("progress");
+  prog.className = "on"; $("progText").textContent = "connecting…";
+
+  try {
+    // server-cache first: a cached crawl needs neither the crawl stream nor its
+    // rate limit (the signed-in session token rides in the headers)
+    let g = await apiFetch(`/api/graph/${n}?images=${state.images ? 1 : 0}`);
+    if (g.ok) {
+      prog.classList.add("done");
+      $("progText").textContent = "loaded from server cache";
+    } else {
+      const res = await apiFetch(`/api/crawl/${n}?images=${state.images ? 1 : 0}`);
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `crawl failed (${res.status})`);
+      }
+      let failed = null;
+      await readSse(res, (event, data) => {
+        if (event === "progress") {
+          $("progText").textContent = `${PHASE_LABEL[data.phase] || data.phase} — ${data.discovered} discovered, ${data.fetched} fetched, ${data.contentFetched} contents${state.images ? `, ${data.images} images` : ""}`;
+        } else if (event === "ready") {
+          prog.classList.add("done");
+          $("progText").textContent = `crawl complete — ${data.stats.nodes} inscriptions (${data.stats.children} children, ${data.stats.reinscriptions} reinscriptions, ${data.stats.neighbors} neighbor districts)${data.stats.truncated.length ? " · some caps hit" : ""}`;
+        } else if (event === "error") {
+          failed = data.message || "crawl failed";
+        }
+      });
+      if (failed) throw new Error(failed);
+      g = await apiFetch(`/api/graph/${n}?images=${state.images ? 1 : 0}`);
+      if (!g.ok) throw new Error("could not load the crawled graph");
+    }
+    state.graph = await g.json();
+    state.ready = true;
+    $("crawlInfo").textContent = `${state.graph.bitmap}.bitmap · crawled ${new Date(state.graph.crawledAt).toLocaleTimeString()}`;
+    $("graphTitle").textContent = `${state.graph.bitmap}.bitmap — ${state.graph.stats.nodes} inscriptions`;
+    renderTree();
+    if (!state.history.length) {
+      setMsgsNote(`Crawl of <b>${state.graph.bitmap}.bitmap</b> ready — ask anything about its family. Try: “summarize this district”, “draw the family tree”, “what do the text inscriptions say?”`);
+    }
+    saveSession();
+  } catch (e) {
+    prog.className = "on err";
+    $("progText").textContent = `✗ ${e.message}`;
+  } finally {
+    state.crawling = false;
+    setControls();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chat flow
+// ---------------------------------------------------------------------------
+function setMsgsNote(html) { $("msgs").innerHTML = `<div class="note">${html}</div>`; }
+
+// How far the inscribed bitmap index reaches — the server tells us, so the UI
+// follows along when a new index page is published.
+const maxBm = () => state.cfg?.maxBitmap ?? 941999;
+const maxBmText = () => maxBm().toLocaleString("en-US");
+const introNoteHtml = () =>
+  `Enter a bitmap number (0–${maxBmText()}) and press Explore.<br>The app reads the whole on-chain family via the ordinals.com recursive API, then Claude answers questions about it.`;
+
+function addMsg(role, textOrHtml, { html = false, err = false } = {}) {
+  const div = document.createElement("div");
+  div.className = `msg ${role}${err ? " err" : ""}`;
+  if (html) div.innerHTML = textOrHtml; else div.textContent = textOrHtml;
+  $("msgs").appendChild(div);
+  $("msgs").scrollTop = $("msgs").scrollHeight;
+  return div;
+}
+
+function renderMarkdown(el, text) {
+  el.innerHTML = DOMPurify.sanitize(marked.parse(text), MD_ALLOWED);
+}
+
+let mermaidSeq = 0;
+async function renderMermaidIn(el) {
+  for (const code of [...el.querySelectorAll("pre code.language-mermaid")]) {
+    const src = code.textContent;
+    try {
+      const { svg } = await mermaid.render(`mmd${++mermaidSeq}`, src);
+      const wrap = document.createElement("div");
+      wrap.className = "mermaid-svg";
+      // html:true keeps label markup inside foreignObject for diagram types that
+      // still use it (scripts/handlers are stripped by DOMPurify regardless)
+      wrap.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true, html: true } });
+      code.closest("pre").replaceWith(wrap);
+    } catch { /* keep the fenced code visible */ }
+  }
+}
+
+async function sendChat() {
+  const text = $("chatInput").value.trim();
+  if (!text || !state.ready || state.streaming) return;
+  if (text.length > 8000) { alert("Message too long (8000 chars max)."); return; }
+  if (state.history.length >= 39) { alert("This chat is at its length limit — press New chat."); return; }
+  if (state.history.length >= 29) addMsg("ai", "Heads up: long chats re-send the whole history each turn and cost more — consider New chat.", { err: false });
+
+  $("chatInput").value = "";
+  const clearedNote = $("msgs").querySelector(".note"); if (clearedNote) clearedNote.remove();
+  const gen = state.chatGen; // guards history writes if New chat / a bitmap switch happens mid-stream
+  state.history.push({ role: "user", content: text });
+  addMsg("user", text);
+  state.streaming = true; setControls();
+
+  const aiDiv = addMsg("ai", "…");
+  let acc = "", rafPending = false, finished = false;
+  const paint = () => {
+    rafPending = false;
+    renderMarkdown(aiDiv, acc + (finished ? "" : " ▌"));
+    $("msgs").scrollTop = $("msgs").scrollHeight;
+  };
+
+  try {
+    const headers = { "Content-Type": "application/json" };
+    // the key only rides along in "key" mode — in "questions" mode the server
+    // charges the free daily question / the bought balance instead
+    const userKey = useKeyMode() ? getUserKey() : "";
+    if (userKey) headers["x-anthropic-key"] = userKey;
+    const res = await apiFetch("/api/chat", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        bitmap: state.bitmap, images: state.images, messages: state.history,
+        model: userKey ? getModel() : undefined,   // model choice needs your own key
+        contextBudget: getCtxBudget(),
+        ...userPrompts(),                          // 📜 the reader's own instructions
+      }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      if (j.kind === "quota" || j.kind === "config") openSettings(); // key needed — take them to the fix
+      throw new Error(j.error || `chat failed (${res.status})`);
+    }
+    let chatErr = null, usage = null, stop = null;
+    await readSse(res, (event, data) => {
+      if (event === "token") {
+        acc += data.text;
+        if (!rafPending) { rafPending = true; requestAnimationFrame(paint); }
+      } else if (event === "usage") {
+        usage = data;
+        onUsageEvent(data);
+        if (data.questions_left != null) { // the server just charged this turn
+          state.balance = { questions: data.questions_left, freeLeft: data.free_left ?? 0 };
+          renderChatStatus();
+          updateWalletUi();
+        }
+      }
+      else if (event === "done") stop = data.stop_reason;
+      else if (event === "error") chatErr = data;
+    });
+    finished = true;
+    if (chatErr) {
+      if (acc) { renderMarkdown(aiDiv, acc); await renderMermaidIn(aiDiv); if (gen === state.chatGen) state.history.push({ role: "assistant", content: acc }); }
+      addMsg("ai", `✗ ${chatErr.message}`, { err: true });
+      if (!acc) aiDiv.remove();
+      if (chatErr.kind === "config" || chatErr.kind === "auth") openSettings(); // missing/bad key -> take them straight to the fix
+    } else {
+      renderMarkdown(aiDiv, acc);
+      await renderMermaidIn(aiDiv);
+      if (gen === state.chatGen) state.history.push({ role: "assistant", content: acc });
+      if (stop === "max_tokens") addMsg("ai", "⚠ the answer hit the length limit and was cut off — ask for the rest.", { err: true });
+      if (usage?.charged === "free") {
+        const left = usage.questions_left ?? 0;
+        addMsg("ai", `That was today's free question 🎁 — you have ${left} bought question${left === 1 ? "" : "s"} left. Buy more or add your own API key in Settings (⚙).`, { err: false });
+      }
+    }
+    saveSession();
+  } catch (e) {
+    finished = true;
+    aiDiv.remove();
+    if (gen === state.chatGen) state.history.pop(); // let the user retry the same question
+    addMsg("ai", `✗ ${e.message}`, { err: true });
+  } finally {
+    state.streaming = false; setControls();
+    $("msgs").scrollTop = $("msgs").scrollHeight;
+  }
+}
+
+function newChat() {
+  state.chatGen++; // any in-flight stream must not write into the fresh history
+  state.history = [];
+  setMsgsNote(state.ready ? "New chat — the crawl is still loaded." : "Enter a bitmap number and press Explore.");
+  saveSession();
+}
+
+// ---------------------------------------------------------------------------
+// Family explorer: a file-explorer tree of the crawled inscriptions.
+// - every inscription is a "folder" row; expanding it reveals its children
+//   and the reinscriptions on its sat (lazily rendered)
+// - a child with several parents appears under EACH of its parents (a DAG
+//   shown as an explorer); rows with >1 parent carry a ⬆N badge listing them,
+//   and a path guard turns any cycle into an inert "already open above" stub
+// - clicking a row previews its /content in the iframe under the tree
+// - rows owned by the signed-in wallet get a green ✓ circle on the right
+// ---------------------------------------------------------------------------
+let treeIdx = null;
+let selRow = null;
+const pushTo = (m, k, v) => { const l = m.get(k); if (l) l.push(v); else m.set(k, [v]); };
+
+function buildTreeIndex() {
+  const g = state.graph;
+  const byId = new Map(g.nodes.map((n) => [n.id, n]));
+  const kids = new Map();      // parentId -> [childId]  (child + ancestor edges)
+  const parentsOf = new Map(); // childId  -> [parentId] (child edges only — the ⬆ badge)
+  const reins = new Map();     // satOwnerId -> [reinscriptionId]
+  for (const e of g.edges) {
+    if (!byId.has(e.from) || !byId.has(e.to)) continue;
+    if (e.type === "child" || e.type === "ancestor") { pushTo(kids, e.from, e.to); pushTo(parentsOf, e.to, e.from); }
+    else if (e.type === "reinscription") pushTo(reins, e.from, e.to);
+  }
+  const cmp = (a, b) => (byId.get(a).number ?? Infinity) - (byId.get(b).number ?? Infinity) || a.localeCompare(b);
+  for (const l of kids.values()) l.sort(cmp);
+  for (const l of reins.values()) l.sort(cmp);
+  return { byId, kids, parentsOf, reins };
+}
+
+const nodeLabel = (n) => (n.bitmap != null ? `${n.bitmap}.bitmap` : `#${n.number ?? short(n.id)}`);
+const ownedByMe = (n) => !!state.wallet && !!n.address && n.address === state.wallet.address;
+
+// A row renders in a DIRECTION: "down" rows (normal) expand into reins +
+// children + this node's OTHER parents (as ⬆ up-rows); "up" rows are the
+// upward chain — they expand only into THEIR parents, climbing further up.
+// `via` is the node we arrived from, excluded from the other-parents list.
+function makeRow(node, path, opts = {}) {
+  const dir = opts.dir || "down";
+  const { kids, parentsOf, reins } = treeIdx;
+  const li = document.createElement("li");
+  const row = document.createElement("div");
+  const parentIds = parentsOf.get(node.id) || [];
+  const childIds = dir === "down" ? (kids.get(node.id) || []) : [];
+  const reinIds = dir === "down" ? (reins.get(node.id) || []) : [];
+  const upIds = parentIds.filter((p) => p !== opts.via);
+  const expandable = childIds.length + reinIds.length + upIds.length > 0;
+  row.className = `frow k-${node.kind}${dir === "up" ? " dir-up" : ""}`;
+  row.innerHTML = `
+    <span class="tw">${expandable ? "▸" : ""}</span>
+    <span class="ic">${dir === "up" ? "⬆" : node.kind === "reinscription" ? "↻" : node.bitmap != null ? "▣" : "▢"}</span>
+    <span class="lgroup"><span class="lbl">${escapeHtml(nodeLabel(node))}</span>${node.delegate ? `<span class="dlg" title="delegate inscription — displays the content of ${escapeHtml(node.delegate)}">⧉</span>` : ""}</span>
+    <span class="fdate">${node.timestamp ? new Date(node.timestamp * 1000).toISOString().slice(0, 10) : ""}</span>
+    <span class="chip">${escapeHtml(node.delegate ? "delegate" : (node.content_type || "?").split(";")[0])}</span>
+    <span class="cnt${expandable ? "" : " off"}">${expandable ? [reinIds.length ? `↻${reinIds.length}` : "", childIds.length || "", upIds.length ? `⬆${upIds.length}` : ""].filter(Boolean).join("·") : ""}</span>
+    <span class="pbadge${parentIds.length > 1 ? "" : " off"}"${parentIds.length > 1 ? ` title="${parentIds.length} parents:&#10;${escapeHtml(parentIds.map((p) => nodeLabel(treeIdx.byId.get(p))).join("\n"))}"` : ""}>${parentIds.length > 1 ? `⬆${parentIds.length}` : "⬆"}</span>
+    <span class="endpad"></span>
+    <span class="own${ownedByMe(node) ? "" : " off"}" title="your wallet owns this inscription">✓</span>
+  `;
+  li.appendChild(row);
+  let open = false, sub = null;
+  const toggle = () => {
+    if (!expandable) return;
+    open = !open;
+    row.querySelector(".tw").textContent = open ? "▾" : "▸";
+    if (open && !sub) {
+      sub = document.createElement("ul");
+      const nextPath = new Set(path);
+      nextPath.add(node.id);
+      const stub = (n) => {
+        // cycle in the DAG (e.g. mutual parents) — render an inert stub
+        const st = document.createElement("li");
+        st.className = "fstub";
+        st.textContent = `↺ ${nodeLabel(n)} — already open above`;
+        sub.appendChild(st);
+      };
+      // reinscriptions FIRST (on this inscription's own sat), then children …
+      for (const cid of [...reinIds, ...childIds]) {
+        const child = treeIdx.byId.get(cid);
+        if (nextPath.has(cid)) { stub(child); continue; }
+        sub.appendChild(makeRow(child, nextPath, { via: node.id, dir: "down" }));
+      }
+      // … then the OTHER parents as ⬆ up-rows, each climbing further upward
+      for (const pid of upIds) {
+        const par = treeIdx.byId.get(pid);
+        if (nextPath.has(pid)) { stub(par); continue; }
+        sub.appendChild(makeRow(par, nextPath, { via: node.id, dir: "up" }));
+      }
+      li.appendChild(sub);
+    }
+    if (sub) sub.style.display = open ? "" : "none";
+  };
+  li.__toggle = toggle;
+  row.onclick = (ev) => { ev.stopPropagation(); selectNode(node, row); toggle(); };
+  return li;
+}
+
+let selNode = null;
+let prevTab = "content"; // remembered across selections
+
+function metaRows(node) {
+  const { parentsOf } = treeIdx || {};
+  const parents = (parentsOf?.get(node.id) || []).map((p) => treeIdx.byId.get(p)).filter(Boolean);
+  const date = (ts) => (ts ? new Date(ts * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC" : "?");
+  const link = (id) => `<a href="https://ordinals.com/inscription/${encodeURIComponent(id)}" target="_blank" rel="noopener">${escapeHtml(short(id))}…</a>`;
+  const rows = [
+    ["label", escapeHtml(nodeLabel(node))],
+    ["kind", escapeHtml(node.kind)],
+    ["inscription #", node.number ?? "?"],
+    ["id", `${escapeHtml(node.id)}`],
+    ["content-type", escapeHtml(node.content_type ?? "?")],
+    ["size", node.content_length != null ? `${node.content_length.toLocaleString()} bytes` : "?"],
+    ["created", date(node.timestamp)],
+    ["block height", node.height ?? "?"],
+    ["sat", node.sat != null ? String(node.sat) : "?"],
+    ["owner", node.address ? `${escapeHtml(node.address)}${ownedByMe(node) ? ' <span class="yes">— yours ✓</span>' : ""}` : "?"],
+  ];
+  if (node.bitmap != null) rows.splice(2, 0, ["bitmap", `${node.bitmap}.bitmap`]);
+  if (node.delegate) rows.push(["delegate", link(node.delegate)]);
+  if (parents.length) rows.push([`parents (${parents.length})`, parents.map((p) => `${escapeHtml(nodeLabel(p))} ${link(p.id)}`).join("<br>")]);
+  return `<table>${rows.map(([k, v]) => `<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`).join("")}</table>`;
+}
+
+function applyPrevTab() {
+  const node = selNode;
+  const pre = $("prevText"), fr = $("prevFrame"), meta = $("prevMeta");
+  $("tabContent").classList.toggle("on", prevTab === "content");
+  $("tabMeta").classList.toggle("on", prevTab === "meta");
+  if (prevTab === "meta") {
+    meta.innerHTML = node ? metaRows(node) : "";
+    meta.style.display = ""; pre.style.display = "none"; fr.style.display = "none";
+    return;
+  }
+  meta.style.display = "none";
+  // captured text renders in-theme (readable white-on-dark); everything else
+  // goes through the iframe (white background so plain text stays legible)
+  if (node && node.text != null) {
+    pre.textContent = node.text;
+    pre.style.display = ""; fr.style.display = "none";
+  } else {
+    pre.style.display = "none"; fr.style.display = "";
+  }
+}
+
+function selectNode(node, row) {
+  selRow?.classList.remove("sel");
+  selRow = row;
+  row?.classList.add("sel");
+  selNode = node;
+  $("prevFrame").src = node.text != null ? "about:blank" : `https://ordinals.com/content/${encodeURIComponent(node.id)}`;
+  applyPrevTab();
+  $("prevLabel").innerHTML = `<b>${escapeHtml(nodeLabel(node))}</b> · ${escapeHtml(short(node.id))}… · ${escapeHtml(node.delegate ? "delegate ⧉" : (node.content_type || "?").split(";")[0])}${node.address ? ` · ${ownedByMe(node) ? '<span style="color:var(--ok)">yours ✓</span>' : `owner ${escapeHtml(node.address.slice(0, 5))}…${escapeHtml(node.address.slice(-4))}`}` : ""}`;
+  $("prevTabs").style.display = "";
+  $("prevCopy").style.display = "";
+  $("prevLink").style.display = "";
+  $("prevAsk").style.display = "";
+  $("prevLink").href = `https://ordinals.com/inscription/${encodeURIComponent(node.id)}`;
+  $("prevCopy").onclick = () => navigator.clipboard?.writeText(node.id);
+  $("prevAsk").onclick = () => {
+    const name = node.bitmap != null ? `${node.bitmap}.bitmap` : `inscription #${node.number ?? "?"} (${short(node.id)}…)`;
+    $("chatInput").value = `Tell me about ${name} — what is it and how does it relate to ${state.graph.bitmap}.bitmap?`;
+    $("chatInput").focus();
+  };
+}
+$("tabContent").onclick = () => { prevTab = "content"; applyPrevTab(); };
+$("tabMeta").onclick = () => { prevTab = "meta"; applyPrevTab(); };
+
+function renderTree() {
+  if (!state.graph) return;
+  treeIdx = buildTreeIndex();
+  selRow = null;
+  const rootUl = $("fileTree");
+  rootUl.innerHTML = "";
+  const root = treeIdx.byId.get(state.graph.rootId);
+  const rootLi = makeRow(root, new Set());
+  rootUl.appendChild(rootLi);
+  rootLi.__toggle(); // the district opens one level by default
+  const cmpN = (a, b) => (a.number ?? Infinity) - (b.number ?? Infinity);
+  const outside = state.graph.nodes.filter((x) => x.kind === "parent" || x.kind === "neighbor-bitmap").sort(cmpN);
+  if (outside.length) {
+    const sep = document.createElement("li");
+    sep.className = "fsep";
+    sep.textContent = "co-parents & neighbor districts (not crawled into)";
+    rootUl.appendChild(sep);
+    for (const p of outside) rootUl.appendChild(makeRow(p, new Set()));
+  }
+}
+
+// splitter: drag the bar to resize tree vs content viewer (vertical split —
+// growing one shrinks the other; the tree is flex:1 and yields automatically)
+{
+  const bar = $("splitBar"), box = $("previewBox");
+  const saved = Number(localStorage.getItem("bac_prevh"));
+  if (saved >= 100 && saved <= 900) box.style.height = `${saved}px`;
+  let drag = null;
+  bar.addEventListener("pointerdown", (e) => {
+    drag = { y: e.clientY, h: box.getBoundingClientRect().height };
+    bar.classList.add("drag");
+    bar.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  bar.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const paneH = $("graphPane").getBoundingClientRect().height;
+    const h = Math.min(Math.max(drag.h + (drag.y - e.clientY), 100), Math.max(140, paneH - 170));
+    box.style.height = `${h}px`;
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    drag = null;
+    bar.classList.remove("drag");
+    try { localStorage.setItem("bac_prevh", String(Math.round(box.getBoundingClientRect().height))); } catch {}
+  };
+  bar.addEventListener("pointerup", endDrag);
+  bar.addEventListener("pointercancel", endDrag);
+}
+
+// ---------------------------------------------------------------------------
+// session persistence + wiring
+// ---------------------------------------------------------------------------
+function saveSession() {
+  try { sessionStorage.setItem("bac_session", JSON.stringify({ bitmap: state.bitmap, images: state.images, history: state.history, wallet: state.wallet, token: state.token })); } catch {}
+}
+function restoreSession() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem("bac_session") || "null");
+    if (!s) return;
+    if (s.wallet?.address && s.token) { state.wallet = s.wallet; state.token = s.token; updateWalletUi(); }
+    if (s.bitmap == null) return;
+    $("bmInput").value = s.bitmap;
+    state.imagesOn = s.images !== false;
+    renderImgToggle();
+    state.history = Array.isArray(s.history) ? s.history : [];
+    if (state.history.length) {
+      $("msgs").innerHTML = "";
+      (async () => {
+        for (const m of state.history) {
+          if (m.role === "user") addMsg("user", m.content);
+          else { const el = addMsg("ai", ""); renderMarkdown(el, m.content); await renderMermaidIn(el); }
+        }
+      })();
+    }
+    explore(); // server-side crawl cache makes this instant within the TTL
+  } catch {}
+}
+
+function setControls() {
+  // free-typing a bitmap number needs: gate off, a PathScriber, or a question
+  // credit (today's free one counts — it's full access for a day)
+  const gateLocked = !!state.cfg?.walletGate && !state.wallet?.unlocked && !hasCredit();
+  $("bmInput").disabled = gateLocked;
+  $("bmInput").placeholder = gateLocked ? "via wallet ↦" : "bitmap #";
+  $("exploreBtn").disabled = state.crawling;
+  $("chatInput").disabled = !state.ready || state.streaming;
+  $("sendBtn").disabled = !state.ready || state.streaming;
+  $("newChatBtn").disabled = state.streaming || (!state.ready && !state.history.length);
+  $("shareBtn").disabled = state.streaming || !state.history.some((m) => m.role === "assistant");
+}
+
+// ---------------------------------------------------------------------------
+// Preferences (model + context size) and local token-usage tracking
+// ---------------------------------------------------------------------------
+const PRICES = { "claude-opus-5": [5, 25], "claude-sonnet-5": [3, 15], "claude-haiku-4-5": [1, 5] }; // $/MTok in,out
+const getModel = () => localStorage.getItem("bac_model") || "claude-opus-5";
+const getCtxBudget = () => Number(localStorage.getItem("bac_ctx")) || 200000;
+
+const USAGE_ZERO = { inTok: 0, outTok: 0, cacheR: 0, cacheW: 0, turns: 0, cost: 0, lastCtx: 0, lastWindow: 1000000, lastModel: "claude-opus-5" };
+let usageTotals = { ...USAGE_ZERO };
+try { usageTotals = { ...USAGE_ZERO, ...JSON.parse(localStorage.getItem("bac_usage") || "{}") }; } catch {}
+
+function onUsageEvent(u) {
+  const p = PRICES[u.model] || PRICES["claude-opus-5"];
+  usageTotals.inTok += u.input_tokens; usageTotals.outTok += u.output_tokens;
+  usageTotals.cacheR += u.cache_read_input_tokens; usageTotals.cacheW += u.cache_creation_input_tokens;
+  usageTotals.turns += 1;
+  usageTotals.cost += (u.input_tokens * p[0] + u.cache_read_input_tokens * p[0] * 0.1 + u.cache_creation_input_tokens * p[0] * 1.25 + u.output_tokens * p[1]) / 1e6;
+  usageTotals.lastCtx = u.input_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens;
+  usageTotals.lastWindow = u.window || 1000000;
+  usageTotals.lastModel = u.model || "claude-opus-5";
+  try { localStorage.setItem("bac_usage", JSON.stringify(usageTotals)); } catch {}
+  updateUsageRing();
+}
+function updateUsageRing() {
+  const pct = Math.min(100, Math.round((usageTotals.lastCtx / usageTotals.lastWindow) * 100));
+  $("usageRing").style.setProperty("--p", usageTotals.lastCtx ? Math.max(pct, 3) : 0);
+  $("usageBtn").title = usageTotals.lastCtx
+    ? `Context: ${pct}% of the ${fmtTok(usageTotals.lastWindow)} window — click for details`
+    : "Token usage";
+}
+const fmtTok = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n % 1e6 ? 1 : 0)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n));
+const fmtNum = (n) => n.toLocaleString("en-US");
+
+function openUsage() {
+  const t = usageTotals;
+  const pct = Math.min(100, (t.lastCtx / t.lastWindow) * 100);
+  $("ctxBarLabel").textContent = t.lastCtx
+    ? `Context window (last answer): ${fmtNum(t.lastCtx)} of ${fmtTok(t.lastWindow)} tokens (${pct.toFixed(1)}%) — ${t.lastModel}`
+    : "No answers yet — the bar fills as you chat.";
+  $("ctxBarFill").style.width = `${t.lastCtx ? Math.max(pct, 1) : 0}%`;
+  $("usageStats").innerHTML = `
+    <span>Questions asked <b>${fmtNum(t.turns)}</b></span>
+    <span>Est. cost <b>$${t.cost.toFixed(4)}</b></span>
+    <span>Input tokens <b>${fmtNum(t.inTok)}</b></span>
+    <span>Output tokens <b>${fmtNum(t.outTok)}</b></span>
+    <span>Cache reads <b>${fmtNum(t.cacheR)}</b></span>
+    <span>Cache writes <b>${fmtNum(t.cacheW)}</b></span>`;
+  $("usageWrap").classList.add("on");
+}
+$("usageBtn").onclick = openUsage;
+$("closeUsageBtn").onclick = () => $("usageWrap").classList.remove("on");
+$("usageWrap").addEventListener("click", (e) => { if (e.target === $("usageWrap")) $("usageWrap").classList.remove("on"); });
+$("resetUsageBtn").onclick = () => { usageTotals = { ...USAGE_ZERO }; try { localStorage.setItem("bac_usage", JSON.stringify(usageTotals)); } catch {} updateUsageRing(); openUsage(); };
+updateUsageRing();
+
+// ---------------------------------------------------------------------------
+// Share the last Q&A as a theme-styled image (clipboard; download fallback).
+// The card is real DOM serialized into an SVG <foreignObject> and rasterized —
+// nothing external is fetched (markdown is text-only), so the canvas stays
+// clean and can be exported.
+// ---------------------------------------------------------------------------
+const SHARE_CSS = `
+  .card{position:relative;width:1000px;background:#0d1117;color:#e6edf3;font:15px/1.5 system-ui,'Segoe UI',Roboto,sans-serif;padding:22px 26px 58px;border:1px solid #2d333b;border-radius:14px}
+  .head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #2d333b}
+  .head .bm{color:#e3b341;font-weight:700;font-size:19px}
+  .head .dt{color:#8b949e;font-size:12px}
+  .m{max-width:88%;padding:11px 14px;border-radius:12px;margin:10px 0;overflow-wrap:break-word}
+  .mu{margin-left:auto;background:#1c2330;border:1px solid #2d333b;white-space:pre-wrap;width:fit-content}
+  .ma{background:#161b22;border:1px solid #2d333b}
+  .ma p{margin:.4em 0}
+  .ma pre{background:#0a0d12;border:1px solid #2d333b;border-radius:8px;padding:9px;overflow:hidden;font-size:12.5px}
+  .ma code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+  .ma table{border-collapse:collapse;margin:.5em 0}
+  .ma th,.ma td{border:1px solid #2d333b;padding:4px 9px;font-size:12.5px;text-align:left}
+  .ma a{color:#58a6ff;text-decoration:none}
+  .ma ul,.ma ol{margin:.4em 0;padding-left:1.4em}
+  .ma h1,.ma h2,.ma h3,.ma h4{margin:.6em 0 .3em;font-size:1.05em}
+  .ma blockquote{margin:.4em 0;padding-left:10px;border-left:3px solid #2d333b;color:#8b949e}
+  .ma .mermaid-svg{background:#0a0d12;border:1px solid #2d333b;border-radius:8px;padding:8px;margin:.5em 0}
+  .ma .mermaid-svg svg{max-width:100%;height:auto}
+  .wm{position:absolute;right:20px;bottom:14px;font-weight:800;font-size:24px;letter-spacing:.02em;color:rgba(230,237,243,.5);text-shadow:0 2px 10px rgba(0,0,0,.8);pointer-events:none}
+  .wm i{font-style:normal;color:rgba(227,179,65,.8)}
+`;
+
+async function buildShareCard() {
+  const userEls = document.querySelectorAll("#msgs .msg.user");
+  const aiEls = document.querySelectorAll("#msgs .msg.ai:not(.err)");
+  if (!userEls.length || !aiEls.length) return null;
+  const W = 1000;
+  const holder = document.createElement("div");
+  holder.style.cssText = `position:fixed;left:-99999px;top:0;width:${W}px`;
+  const card = document.createElement("div");
+  card.className = "card";
+  card.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  card.innerHTML = `<style>${SHARE_CSS}</style>
+    <div class="head"><span class="bm">${state.bitmap != null ? `${Number(state.bitmap)}.bitmap` : "bitmap"}</span><span class="dt">${new Date().toISOString().slice(0, 10)}</span></div>
+    <div class="m mu">${userEls[userEls.length - 1].innerHTML}</div>
+    <div class="m ma">${aiEls[aiEls.length - 1].innerHTML}</div>
+    <div class="wm"><i>◼</i> Bitmap Chat</div>`;
+  holder.appendChild(card);
+  document.body.appendChild(holder);
+  const H = Math.ceil(card.getBoundingClientRect().height);
+  const xml = new XMLSerializer().serializeToString(card);
+  holder.remove();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
+  const S = 2; // 2x for crisp text on retina/social
+  const canvas = document.createElement("canvas");
+  canvas.width = W * S;
+  canvas.height = H * S;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0d1117";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.scale(S, S);
+  ctx.drawImage(img, 0, 0);
+  return canvas;
+}
+
+async function shareChatImage() {
+  const btn = $("shareBtn");
+  const orig = btn.innerHTML;
+  const flash = (txt) => { btn.textContent = txt; setTimeout(() => { btn.innerHTML = orig; }, 1800); };
+  try {
+    const canvas = await buildShareCard();
+    if (!canvas) { flash("–"); return; }
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      flash("✓");
+    } catch {
+      // clipboard blocked (permissions/HTTP) — save the PNG instead
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `bitmap-${state.bitmap ?? "chat"}-qa.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      flash("↓");
+    }
+  } catch (e) {
+    console.error("share image:", e);
+    flash("✗");
+  }
+}
+$("shareBtn").onclick = shareChatImage;
+
+// ---------------------------------------------------------------------------
+// Wallet connect + pathscribe gate
+// ---------------------------------------------------------------------------
+const gateNum = () => state.cfg?.gateBitmap ?? 114588;
+
+// Connect = prove ownership: wallet_connect -> one-time challenge -> BIP-322
+// signMessage -> server verifies the signature and issues a session token.
+async function connectWallet() {
+  const btn = $("walletBtn");
+  try {
+    const r = await walletRequest("wallet_connect", null);
+    if (r.status !== "success") throw new Error(r.error?.message || "connection rejected");
+    const ord = r.result.addresses.find((a) => a.purpose === "ordinals");
+    if (!ord) throw new Error("no ordinals address in wallet");
+
+    btn.textContent = "sign the message…"; btn.disabled = true;
+    const chRes = await apiFetch("/api/auth/challenge", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: ord.address }),
+    });
+    const ch = await chRes.json().catch(() => ({}));
+    if (!ch.nonce) throw new Error(ch.error || "challenge failed");
+
+    const sig = await walletRequest("signMessage", { address: ord.address, message: ch.message, protocol: "BIP322" });
+    if (sig.status !== "success") throw new Error(sig.error?.message || "signature rejected");
+
+    btn.textContent = "verifying…";
+    const vRes = await apiFetch("/api/auth/verify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nonce: ch.nonce, signature: sig.result.signature }),
+    });
+    const out = await vRes.json().catch(() => ({}));
+    if (!out.token) throw new Error(out.error || "ownership verification failed");
+    state.token = out.token;
+    await scanWalletAddr(false);
+  } catch (e) {
+    alert(`Wallet sign-in failed: ${e?.message || e}\n\nYou need a sats-connect compatible wallet extension (e.g. Xverse).`);
+  } finally {
+    btn.disabled = false;
+    updateWalletUi();
+    setControls();
+  }
+}
+
+async function scanWalletAddr(fresh) {
+  $("walletBtn").textContent = "scanning wallet…";
+  $("walletBtn").disabled = true;
+  try {
+    const res = await apiFetch(`/api/wallet/scan${fresh ? "?fresh=1" : ""}`, { method: "POST" });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || `wallet scan failed (${res.status})`);
+    }
+    state.wallet = await res.json();
+    saveSession();
+    refreshBalance();
+    loadPromptInfo().then(markPromptBtn); // holdings decide the 📜 slots
+    openPicker();
+  } catch (e) {
+    alert(e?.message || "wallet scan failed");
+  } finally {
+    $("walletBtn").disabled = false;
+    updateWalletUi();
+    setControls();
+  }
+}
+
+function disconnectWallet() {
+  state.wallet = null;
+  state.token = null;
+  promptRights = { above: false, below: false, main: false };
+  closePicker();
+  saveSession();
+  updateWalletUi();
+  setControls();
+  markPromptBtn();
+  setMsgsNote(walletHintHtml());
+}
+
+const walletHintHtml = () =>
+  `Connect your wallet to begin (you'll sign one message — free, nothing on-chain).<br><b>🎁 Everyone gets 1 free question every day</b> — full access to any bitmap, no bitmap needed in your wallet.<br>After that: buy questions, own a <b>PathScriber</b>, or use your own API key.`;
+
+function updateWalletUi() {
+  const w = state.wallet;
+  // address button = who you are + which mode; Orders button = how many questions
+  $("walletBtn").textContent = w ? `${w.address.slice(0, 6)}…${w.address.slice(-4)}${useKeyMode() ? " · key" : " · questions"}` : "Connect wallet";
+  $("walletBtn").classList.toggle("setok", !!w); // green = signed in
+  $("ordersBtn").style.display = w ? "" : "none";
+  $("ordersBtn").textContent = `Orders | ${state.balance.questions + state.balance.freeLeft}`;
+  renderChatStatus();
+}
+
+function openPicker() {
+  const w = state.wallet;
+  if (!w) { connectWallet(); return; }
+  $("pickerAddr").textContent = w.address;
+  $("pickerParcelsTitle").textContent = `Your ${gateNum()} parcels`;
+
+  // LEFT — the wallet's bitmaps, each previewing the LAST inscription on its
+  // sat (the newest reinscription, or the bitmap itself when none exists)
+  const bitmaps = (w.bitmaps || []).map((b) => (typeof b === "number" ? { n: b, previewId: null } : b));
+  $("pickerBitmaps").innerHTML = bitmaps.length
+    ? bitmaps.map((b) => `
+        <div class="bmCard">
+          ${b.previewId ? `<iframe src="https://ordinals.com/content/${encodeURIComponent(b.previewId)}" sandbox="allow-scripts" loading="lazy" referrerpolicy="no-referrer" scrolling="no"></iframe>` : ""}
+          <button class="btn small" data-bm="${Number(b.n)}"><span>${Number(b.n)}.bitmap</span><span class="scanTag">scan →</span></button>
+        </div>`).join("")
+    : `<span class="none">no bitmaps found in this wallet</span>`;
+  for (const btn of $("pickerBitmaps").querySelectorAll("button[data-bm]")) {
+    btn.onclick = () => chooseBitmap(Number(btn.dataset.bm));
+  }
+
+  // MIDDLE — parcels only ("x.114588.bitmap" canonical children)
+  const inscChip = (p, label) => `<button class="btn small" data-insc="${escapeHtml(p.id)}" title="${escapeHtml(p.id)}">${escapeHtml(label)}</button>`;
+  $("pickerParcels").innerHTML = (w.parcels || []).length
+    ? w.parcels.map((p) => inscChip(p, p.text || `${gateNum()} parcel`)).join("")
+    : `<span class="none">none yet</span>`;
+
+  // RIGHT (top) — PathScribers, ABOVE the mint page
+  $("pickerScribers").innerHTML = (w.pathscribers || []).length
+    ? w.pathscribers.map((p) => inscChip(p, `PathScriber #${p.number ?? p.id.slice(0, 8)}`)).join("")
+    : `<span class="none">none yet — mint one below</span>`;
+  for (const btn of document.querySelectorAll("#pickerParcels button[data-insc], #pickerScribers button[data-insc]")) {
+    btn.onclick = () => window.open(`https://ordinals.com/inscription/${encodeURIComponent(btn.dataset.insc)}`, "_blank", "noopener");
+  }
+  if (w.unlocked) {
+    $("pickerGate").innerHTML = `
+      <div class="unlockBox">
+        <div class="unlockBadge">✓</div>
+        <div class="unlockText"><b>Any-bitmap access</b><span>granted by your ${(w.pathscribers || []).length ? "PathScriber" : `${gateNum()} parcel`}</span></div>
+        <div class="unlockField">
+          <span class="hash">#</span><input id="anyBmInput" type="number" min="0" max="${maxBm()}" placeholder="bitmap number">
+          <button id="anyBmGo" class="btn primary small">Scan</button>
+        </div>
+      </div>`;
+    $("anyBmGo").onclick = () => { const v = Number($("anyBmInput").value); if (Number.isInteger(v) && v >= 0) chooseBitmap(v); };
+    $("anyBmInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("anyBmGo").click(); });
+  } else {
+    $("pickerGate").innerHTML = `
+      <div class="lockBox">You don't own a PathScriber yet — owning one (or a ${gateNum()} parcel) unlocks scanning <b>any</b> bitmap. Mint one below, then press ↻.</div>`;
+  }
+
+  // RIGHT — the mint page, ALWAYS shown: full desktop layout scaled to fit,
+  // whole preview is a link (click anywhere -> new tab), wrapper scrolls
+  const mUrl = escapeHtml(state.cfg?.marketUrl || "");
+  $("pickerMarket").innerHTML = `
+      <div class="marketWrap">
+        <a class="marketClick" href="${mUrl}" target="_blank" rel="noopener noreferrer" title="Open the PathScriber mint page in a new tab">
+          <div class="marketScaled"><iframe id="marketFrame" src="${mUrl}" scrolling="no" loading="lazy" referrerpolicy="no-referrer"></iframe></div>
+        </a>
+      </div>
+      <div class="claimBox">
+        <div class="claimLead">Minted one? Paste its inscription id and it counts right away.</div>
+        <div class="claimField">
+          <input id="scriberInput" placeholder="64 letters and numbers, then i0" spellcheck="false" autocomplete="off">
+          <button id="scriberGo" class="btn primary small">Add</button>
+        </div>
+        <div id="scriberMsg" class="claimMsg"></div>
+      </div>`;
+  $("scriberGo").onclick = claimPathscriber;
+  $("scriberInput").addEventListener("keydown", (e) => { if (e.key === "Enter") claimPathscriber(); });
+
+  $("pickerWrap").classList.add("on");
+  fitMarketFrame(); // needs layout — must run after the panel is visible
+}
+function closePicker() { $("pickerWrap").classList.remove("on"); }
+
+// "I minted one" — name the mint instead of waiting for the wallet scan to
+// stumble on it. The server checks the content AND that this wallet owns it.
+async function claimPathscriber() {
+  const say = (text, cls = "") => { const m = $("scriberMsg"); if (m) { m.className = `claimMsg ${cls}`; m.textContent = text; } };
+  const id = ($("scriberInput")?.value || "").trim();
+  if (!id) return say("paste the inscription id of your mint", "err");
+  $("scriberGo").disabled = true;
+  say("checking it on-chain…", "busy");
+  try {
+    const res = await apiFetch("/api/wallet/pathscriber", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || "could not add that PathScriber");
+    if (d.scan) {                 // re-render the popup with the unlock in place
+      state.wallet = d.scan;
+      saveSession(); updateWalletUi(); setControls(); openPicker();
+    }
+    refreshBalance();             // the extra free question shows immediately
+    say(`PathScriber ${d.pathscriber.number != null ? `#${d.pathscriber.number}` : ""} added — any bitmap is unlocked and you get +1 free question a day.`.replace(/\s+/g, " "), "ok");
+  } catch (e) {
+    say(e?.message || String(e), "err");
+  } finally {
+    const b = $("scriberGo");     // openPicker() may have replaced the button
+    if (b) b.disabled = false;
+  }
+}
+
+// Render the mint page at desktop size and scale it to the column width, so
+// the WHOLE layout is visible with no horizontal scrolling. The iframe itself
+// never scrolls (scrolling="no", pointer-events:none — clicks hit the link);
+// vertical scrolling happens on .marketWrap over the tall scaled content.
+const MARKET_BASE_W = 1440, MARKET_BASE_H = 4200;
+function fitMarketFrame() {
+  const wrap = document.querySelector("#pickerMarket .marketWrap");
+  const scaled = wrap?.querySelector(".marketScaled");
+  const frame = wrap?.querySelector("iframe");
+  if (!wrap || !scaled || !frame || !wrap.clientWidth) return;
+  const s = wrap.clientWidth / MARKET_BASE_W;
+  frame.style.width = MARKET_BASE_W + "px";
+  frame.style.height = MARKET_BASE_H + "px";
+  frame.style.transform = `scale(${s})`;
+  scaled.style.height = Math.ceil(MARKET_BASE_H * s) + "px";
+}
+window.addEventListener("resize", () => { if ($("pickerWrap").classList.contains("on")) fitMarketFrame(); });
+
+function chooseBitmap(n) {
+  closePicker();
+  $("bmInput").value = n;
+  explore();
+}
+
+$("walletBtn").onclick = () => (state.wallet ? openPicker() : connectWallet());
+$("closePickerBtn").onclick = closePicker;
+$("pickerWrap").addEventListener("click", (e) => { if (e.target === $("pickerWrap")) closePicker(); });
+$("rescanBtn").onclick = () => state.token && scanWalletAddr(true);
+$("disconnectBtn").onclick = disconnectWallet;
+
+// ---------------------------------------------------------------------------
+// Questions: balance, buying with BTC, order history
+// ---------------------------------------------------------------------------
+const fmtSats = (s) => `${s.toLocaleString("en-US")} sats`;
+let buyPack = null, buyFee = null, feeOpts = null, quoteT = null, lastQuote = null;
+
+// The one-line "what can I ask right now" indicator above the composer.
+function renderChatStatus() {
+  const el = $("chatStatus");
+  if (!state.wallet) { el.classList.remove("on"); return; }
+  el.classList.add("on");
+  if (useKeyMode()) {
+    el.innerHTML = `Mode: <b>your API key</b> · unlimited questions · <span class="link" id="csSwitch">switch to questions</span>`;
+  } else {
+    const { questions, freeLeft, freeAllowance } = state.balance;
+    const bits = [`Mode: <b>questions</b>`];
+    bits.push(freeLeft > 0
+      ? `<span class="free">🎁 <b>${freeLeft}</b> free today${freeAllowance > 1 ? ` <span class="dim">of ${freeAllowance}</span>` : ""}</span>`
+      : `<span class="dim">free question${freeAllowance > 1 ? "s" : ""} used today</span>`);
+    bits.push(`<b>${questions}</b> bought`);
+    if (freeLeft + questions === 0) bits.push(`<span class="link" id="csBuy">out of questions — buy more</span>`);
+    else bits.push(`<span class="link" id="csBuy">buy more</span>`);
+    if (getUserKey()) bits.push(`<span class="link" id="csSwitch">use my API key</span>`);
+    el.innerHTML = bits.join(" · ");
+  }
+  $("csSwitch") && ($("csSwitch").onclick = () => setMode(useKeyMode() ? "questions" : "key"));
+  $("csBuy") && ($("csBuy").onclick = () => openSettings());
+}
+
+// Pull balance + free-question state from the server.
+async function refreshBalance() {
+  if (!state.token) { state.balance = { questions: 0, freeLeft: 0, freeAllowance: 1 }; renderChatStatus(); return; }
+  try {
+    const q = await (await apiFetch("/api/quota")).json();
+    state.balance = { questions: q.questions || 0, freeLeft: q.freeLeft || 0, freeAllowance: q.freeAllowance || 1 };
+  } catch { /* keep the last known values */ }
+  $("qBalBig") && ($("qBalBig").textContent = state.balance.questions);
+  if ($("qFreeTag")) {
+    const { freeLeft, freeAllowance } = state.balance;
+    $("qFreeTag").textContent = freeLeft > 0 ? `+${freeLeft} free today` : `0 of ${freeAllowance} free left`;
+    $("qFreeTag").title = freeAllowance > 1 ? `1 free question + 1 for each PathScriber / ${gateNum()} parcel you hold` : "1 free question every day";
+    $("qFreeTag").classList.toggle("off", freeLeft === 0);
+  }
+  renderChatStatus();
+  updateWalletUi();
+  setControls(); // credit can unlock the bitmap input — re-evaluate once known
+}
+
+// --- buy panel (inside Settings) --------------------------------------------
+function renderPacks() {
+  const packs = state.cfg?.packs || [5, 10, 100];
+  $("packRow").innerHTML = packs.map((p) =>
+    `<button class="packBtn${buyPack === p ? " on" : ""}" data-pack="${p}">${p}<small>question${p === 1 ? "" : "s"}</small></button>`).join("");
+  for (const b of $("packRow").querySelectorAll("button")) {
+    b.onclick = () => { buyPack = Number(b.dataset.pack); renderPacks(); refreshQuote(); };
+  }
+}
+
+// Fee picker: three tier cards plus a logarithmic slider (1 → 100 sat/vB) with
+// tick marks and a live number box — all three stay in sync. 1 sat/vB is the
+// floor: below that most nodes won't relay the payment at all.
+const FEE_TICKS = [1, 2, 5, 10, 25, 100];
+const FEE_MAX = 100;
+const feeToPos = (v) => Math.max(0, Math.min(100, (Math.log10(Math.max(1, v)) / Math.log10(FEE_MAX)) * 100));
+const posToFee = (p) => Math.max(1, Math.round(Math.pow(FEE_MAX, p / 100)));
+
+async function renderFees() {
+  if (!feeOpts) {
+    try { feeOpts = await (await fetch("/api/fees")).json(); } catch { feeOpts = { fast: 12, medium: 6, slow: 3 }; }
+    buyFee = buyFee ?? feeOpts.medium;
+  }
+  const tiers = [
+    { k: "slow", cls: "eco", label: "Economy", hint: "cheapest — can take hours" },
+    { k: "medium", cls: "norm", label: "Normal", hint: "usually within ~30 minutes" },
+    { k: "fast", cls: "fast", label: "Fast", hint: "aims for the next block" },
+  ];
+  $("feeRow").innerHTML = tiers.map((t) =>
+    `<button class="feeCard ${t.cls}" data-fee="${feeOpts[t.k]}" title="${t.hint}">
+       <span class="ft">${t.label}</span>
+       <span class="fv">${feeOpts[t.k]} <small>sat/vB</small></span>
+     </button>`).join("");
+  for (const b of $("feeRow").querySelectorAll("button")) b.onclick = () => setFee(Number(b.dataset.fee));
+
+  $("feeTicks").innerHTML = FEE_TICKS.map((v) => `<span data-fee="${v}" style="left:${feeToPos(v)}%">${v}</span>`).join("");
+  for (const s of $("feeTicks").querySelectorAll("span")) s.onclick = () => setFee(Number(s.dataset.fee));
+
+  $("feeRange").oninput = (e) => setFee(posToFee(Number(e.target.value)), { fromSlider: true });
+  $("feeCustom").oninput = (e) => { const v = Number(e.target.value); if (v >= 1) setFee(v, { fromBox: true }); };
+  setFee(buyFee);
+}
+
+function setFee(v, { fromSlider = false, fromBox = false } = {}) {
+  buyFee = Math.max(1, Math.round(v));
+  const pos = feeToPos(buyFee);
+  if (!fromSlider) $("feeRange").value = String(Math.round(pos));
+  if (!fromBox) $("feeCustom").value = String(buyFee);
+  // gold fill up to the thumb, like the reference
+  $("feeRange").style.background = `linear-gradient(90deg,var(--accent) ${pos}%,var(--line) ${pos}%)`;
+  for (const b of $("feeRow").querySelectorAll("button")) b.classList.toggle("on", Number(b.dataset.fee) === buyFee);
+  for (const s of $("feeTicks").querySelectorAll("span")) s.classList.toggle("past", Number(s.dataset.fee) <= buyFee);
+}
+
+// Live quote (price moves with BTC). Debounced — the promo box types into it.
+function refreshQuote() {
+  clearTimeout(quoteT);
+  const box = $("quoteBox");
+  if (!buyPack) { box.textContent = "pick a pack"; $("buyBtn").disabled = true; return; }
+  box.textContent = "pricing…";
+  quoteT = setTimeout(async () => {
+    try {
+      const promo = encodeURIComponent($("promoInput").value.trim());
+      // apiFetch, not fetch: signed in, the price knows how many uses of the
+      // code this wallet has left, so a spent code can't surprise us at checkout
+      const q = await (await apiFetch(`/api/orders/quote?pack=${buyPack}&promo=${promo}`)).json();
+      if (q.error) throw new Error(q.error);
+      lastQuote = q;
+      box.innerHTML = `<b>${q.questions} questions</b> — <b>${fmtSats(q.sats)}</b> ≈ €${q.eur.toFixed(2)}` +
+        (q.promoApplied ? ` <span class="disc">(promo −${q.discountPct}%, was €${q.eurFull.toFixed(2)})</span>`
+          : q.promoUsed ? ` <span class="warn">(you have already used that code)</span>`
+          : q.promoExhausted ? ` <span class="warn">(that code has run out)</span>` : "");
+      $("buyBtn").disabled = !state.token;
+      $("buyBtn").textContent = state.token ? `Pay ${fmtSats(q.sats)}` : "Connect wallet to buy";
+    } catch (e) {
+      lastQuote = null;
+      box.textContent = e.message || "could not price this right now";
+      $("buyBtn").disabled = true;
+    }
+  }, 250);
+}
+
+// Create the order, pay it from the wallet, hand the txid back to the server.
+async function buyQuestions() {
+  if (!state.token) { alert("Connect your wallet first."); return; }
+  if (!buyPack) return;
+  const btn = $("buyBtn");
+  const original = btn.textContent;
+  btn.disabled = true;
+  let order = null, broadcast = false;
+  try {
+    btn.textContent = "creating order…";
+    const oRes = await apiFetch("/api/orders", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pack: buyPack, promo: $("promoInput").value.trim() }),
+    });
+    order = await oRes.json();
+    if (!oRes.ok) throw new Error(order.error || "could not create the order");
+
+    // never let the wallet open on a bigger amount than the one on screen
+    if (lastQuote && order.sats > lastQuote.sats * 1.02) {
+      const why = lastQuote.promoApplied && !order.promoApplied
+        ? "the promo code no longer applies to this wallet"
+        : "the BTC price moved";
+      if (!confirm(`The price is now ${fmtSats(order.sats)} (≈ €${order.eur.toFixed(2)}) instead of ${fmtSats(lastQuote.sats)} — ${why}.\n\nPay the new amount?`)) {
+        throw new Error("cancelled");
+      }
+    }
+
+    btn.textContent = "confirm in your wallet…";
+    const payload = { recipients: [{ address: order.payTo, amount: order.sats }] };
+    let sent = await walletRequest("sendTransfer", buyFee ? { ...payload, feeRate: buyFee } : payload);
+    // some wallets reject unknown fields — retry once without the fee hint
+    if (sent.status !== "success" && buyFee && !/reject|cancel|denied|declin/i.test(sent.error?.message || "")) {
+      sent = await walletRequest("sendTransfer", payload);
+    }
+    if (sent.status !== "success") throw new Error(sent.error?.message || "payment cancelled");
+    const txid = sent.result?.txid || sent.result?.txId;
+    if (!txid) throw new Error("the wallet did not return a transaction id");
+    broadcast = true; // real money has left the wallet from here on
+
+    btn.textContent = "recording…";
+    const tRes = await apiFetch(`/api/orders/${order.id}/tx`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ txid }),
+    });
+    const done = await tRes.json();
+    if (!tRes.ok) throw new Error(`${done.error || "could not record the payment"}\n\nYour transaction: ${txid}\nKeep it — send it to support and the questions will be credited.`);
+    closeSettings();
+    openOrders(); // show them the pending payment right away
+  } catch (e) {
+    if (!/^cancelled$/i.test(e?.message || "")) alert(`Purchase failed: ${e?.message || e}`);
+  } finally {
+    // nothing left the wallet: drop the unsaved order so the promo use it was
+    // holding is free again straight away
+    if (order?.id && !broadcast) {
+      apiFetch(`/api/orders/${order.id}`, { method: "DELETE" }).catch(() => {});
+      refreshQuote();
+    }
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+// --- orders modal -----------------------------------------------------------
+const OSTATUS = {
+  awaiting_payment: "awaiting payment", pending: "confirming…",
+  confirmed: "confirmed ✓", underpaid: "underpaid", expired: "expired",
+};
+const ORDERS_PER_PAGE = 6;
+let ordersCache = [], ordersPage = 0;
+
+function renderOrdersPage() {
+  if (!ordersCache.length) {
+    $("ordersList").innerHTML = `<div class="oEmpty">No orders yet — buy questions from Settings (⚙).</div>`;
+    return;
+  }
+  const pages = Math.ceil(ordersCache.length / ORDERS_PER_PAGE);
+  ordersPage = Math.min(Math.max(ordersPage, 0), pages - 1);
+  const rows = ordersCache.slice(ordersPage * ORDERS_PER_PAGE, (ordersPage + 1) * ORDERS_PER_PAGE);
+  $("ordersList").innerHTML = `
+    <table class="otable">
+      <thead><tr><th>date</th><th>questions</th><th>paid</th><th>status</th><th>transaction</th></tr></thead>
+      <tbody>${rows.map((o) => `
+        <tr>
+          <td>${new Date(o.createdAt).toISOString().slice(0, 16).replace("T", " ")}</td>
+          <td><b>+${o.questions}</b>${o.promoApplied ? ` <span style="color:var(--ok)">−${o.discountPct}%</span>` : ""}</td>
+          <td>${fmtSats(o.sats)}<br><span class="dim" style="font-size:10.5px">≈ €${o.eur.toFixed(2)}</span></td>
+          <td><span class="ost ${o.status}">${OSTATUS[o.status] || o.status}</span>${o.note ? `<br><span style="color:var(--bad);font-size:10.5px">${escapeHtml(o.note)}</span>` : ""}</td>
+          <td>${o.txid ? `<a href="https://mempool.space/tx/${o.txid}" target="_blank" rel="noopener">${o.txid.slice(0, 10)}… ↗</a>` : `<span class="dim">—</span>`}</td>
+        </tr>`).join("")}</tbody>
+    </table>
+    ${pages > 1 ? `<div class="opager">
+      <button class="btn small" id="oPrev"${ordersPage === 0 ? " disabled" : ""}>‹</button>
+      <span>${ordersPage + 1} / ${pages}</span>
+      <button class="btn small" id="oNext"${ordersPage >= pages - 1 ? " disabled" : ""}>›</button>
+    </div>` : ""}`;
+  if (pages > 1) {
+    $("oPrev").onclick = () => { ordersPage--; renderOrdersPage(); };
+    $("oNext").onclick = () => { ordersPage++; renderOrdersPage(); };
+  }
+}
+
+async function openOrders(refresh = true) {
+  if (!state.token) { alert("Connect your wallet first."); return; }
+  $("ordersWrap").classList.add("on");
+  $("ordersList").innerHTML = `<div class="oEmpty">loading…</div>`;
+  try {
+    const d = await (await apiFetch(`/api/orders${refresh ? "?refresh=1" : ""}`)).json();
+    if (d.error) throw new Error(d.error);
+    state.balance = { questions: d.questions || 0, freeLeft: d.freeLeft || 0, freeAllowance: d.freeAllowance || 1 };
+    $("ordersAddr").textContent = `${d.address.slice(0, 8)}…${d.address.slice(-6)}`;
+    $("oBal").textContent = d.questions;
+    $("oFree").textContent = `${d.freeLeft} / ${d.freeAllowance}`;
+    $("oFree").nextElementSibling.textContent = d.freeAllowance > 1 ? "free questions left today" : "free question today";
+    $("oMode").textContent = useKeyMode() ? "your API key" : `questions`;
+    ordersCache = d.orders;
+    ordersPage = 0;
+    renderOrdersPage();
+    renderChatStatus();
+    updateWalletUi();
+  } catch (e) {
+    $("ordersList").innerHTML = `<div class="oEmpty">${escapeHtml(e.message || "could not load orders")}</div>`;
+  }
+}
+
+$("ordersBtn").onclick = () => openOrders();
+$("closeOrdersBtn").onclick = () => $("ordersWrap").classList.remove("on");
+$("ordersWrap").addEventListener("click", (e) => { if (e.target === $("ordersWrap")) $("ordersWrap").classList.remove("on"); });
+$("ordersRefresh").onclick = () => openOrders(true);
+$("oBuyBtn").onclick = () => { $("ordersWrap").classList.remove("on"); openSettings(); };
+$("buyBtn").onclick = buyQuestions;
+$("promoInput").oninput = refreshQuote;
+$("modeKeyBtn").onclick = () => { if (!getUserKey()) { alert("Add your API key first."); return; } setMode("key"); };
+$("modeQBtn").onclick = () => setMode("questions");
+
+// ---------------------------------------------------------------------------
+// Settings (BYOK — the visitor's own Anthropic API key)
+// ---------------------------------------------------------------------------
+// Two states: key SET (informational only — no new input until deleted) or
+// key NOT SET (input + Save visible). Prevents silently overwriting a key.
+async function refreshKeyStatus() {
+  const k = getUserKey();
+  const has = !!k;
+  $("keyInput").style.display = has ? "none" : "";
+  $("saveKeyBtn").style.display = has ? "none" : "";
+  $("clearKeyBtn").style.display = has ? "" : "none";
+  $("modelSel").disabled = !has;   // model choice needs your own key
+  $("settingsBtn").textContent = "⚙";
+  $("settingsBtn").classList.toggle("setok", has); // green icon = key saved
+  // which billing mode is active — exactly one column is highlighted
+  const keyMode = useKeyMode();
+  $("modeKeyBtn").classList.toggle("on", keyMode);
+  $("modeQBtn").classList.toggle("on", !keyMode);
+  $("modeKeyBtn").textContent = keyMode ? "in use" : "use this";
+  $("modeQBtn").textContent = keyMode ? "use this" : "in use";
+  $("modeKeyBtn").closest(".scol").classList.toggle("active", keyMode);
+  $("modeQBtn").closest(".scol").classList.toggle("active", !keyMode);
+  refreshQuotaLine();
+  renderChatStatus();
+  const el = $("keyStatus");
+  if (has) {
+    el.className = "keyset";
+    el.textContent = `✓ Key saved (${maskKey(k)}). Delete it to enter a different one.`;
+    return;
+  }
+  el.className = "dim";
+  let server = null;
+  try { server = await (await fetch("/api/config")).json(); } catch {}
+  el.textContent = server?.serverHasKey
+    ? "This server has its own key — adding yours is optional. Paste it below."
+    : "No API key added yet — paste your Anthropic API key below to chat.";
+}
+function openSettings() {
+  $("keyInput").value = "";
+  $("settingsWrap").classList.add("on");
+  refreshKeyStatus();
+  renderPacks();
+  renderFees();
+  refreshBalance();
+  refreshQuote();
+}
+function closeSettings() { $("settingsWrap").classList.remove("on"); }
+$("settingsBtn").onclick = openSettings;
+$("closeSettingsBtn").onclick = closeSettings;
+$("settingsWrap").addEventListener("click", (e) => { if (e.target === $("settingsWrap")) closeSettings(); });
+$("saveKeyBtn").onclick = () => {
+  if (getUserKey()) { refreshKeyStatus(); return; } // already set — delete first (button is hidden, this is a belt-and-braces guard)
+  const k = $("keyInput").value.trim();
+  if (!k) { alert("Paste a key first (sk-ant-…)."); return; }
+  if (!/^sk-ant-/.test(k)) { alert("That doesn't look like an Anthropic API key — it should start with sk-ant-"); return; }
+  localStorage.setItem("bac_anthropic_key", k);
+  $("keyInput").value = "";
+  refreshKeyStatus();
+};
+$("clearKeyBtn").onclick = () => {
+  if (!confirm("Delete your saved API key from this browser?")) return;
+  localStorage.removeItem("bac_anthropic_key");
+  refreshKeyStatus();
+};
+
+// model + context-size preferences (persisted in this browser)
+$("modelSel").value = getModel();
+$("modelSel").onchange = () => localStorage.setItem("bac_model", $("modelSel").value);
+$("ctxSel").value = String(getCtxBudget());
+$("ctxSel").onchange = () => localStorage.setItem("bac_ctx", $("ctxSel").value);
+
+// free-question status line (1 per address per UTC day on the server's key)
+async function refreshQuotaLine() {
+  const el = $("quotaLine");
+  try {
+    const q = await (await apiFetch("/api/quota")).json();
+    if (!q.serverHasKey) { el.textContent = "This server has no key of its own — add your own API key to chat."; return; }
+    if (!q.signedIn) { el.textContent = `Sign in with your wallet for 1 free question a day — plus 1 more for every PathScriber and ${gateNum()} parcel you hold.`; return; }
+    el.textContent = useKeyMode()
+      ? "Using your API key — unlimited questions, your choice of model."
+      : `Using questions — ${q.freeLeft} of ${q.freeAllowance} free left today · ${q.questions} bought.`;
+  } catch { el.textContent = ""; }
+}
+refreshKeyStatus(); // set the ⚙ badge on load
+
+// image-crawl toggle: normal icon = images included; red struck icon = excluded
+function renderImgToggle() {
+  $("imgToggle").classList.toggle("off", !state.imagesOn);
+  $("imgToggle").title = state.imagesOn
+    ? "Images are included in the crawl — click to exclude them (lighter crawl)"
+    : "Images excluded (lighter crawl) — click to include them";
+}
+$("imgToggle").onclick = () => { state.imagesOn = !state.imagesOn; renderImgToggle(); };
+renderImgToggle();
+
+$("exploreBtn").onclick = explore;
+$("sendBtn").onclick = sendChat;
+$("newChatBtn").onclick = newChat;
+$("chatInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+$("bmInput").addEventListener("keydown", (e) => { if (e.key === "Enter") explore(); });
+
+// 📜 instructions panel
+$("promptBtn").onclick = openPrompts;
+$("closePromptBtn").onclick = closePrompts;
+$("promptWrap").addEventListener("click", (e) => { if (e.target === $("promptWrap")) closePrompts(); });
+$("promptAbove").addEventListener("input", () => savePrompt("above"));
+$("promptBelow").addEventListener("input", () => savePrompt("below"));
+$("promptMain").addEventListener("input", () => savePrompt("main"));
+$("mainReset").onclick = () => {
+  $("promptMain").value = housePromptText || "";
+  savePrompt("main");                       // stores "" — back to the app's own
+};
+$("promptClear").onclick = () => {
+  if (!["above", "below", "main"].some((s) => getPrompt(s).trim())) return;
+  if (!confirm("Remove everything you have written here? The app's own instructions stay as they are.")) return;
+  for (const slot of ["above", "below", "main"]) localStorage.removeItem(`bac_prompt_${slot}`);
+  $("promptAbove").value = ""; $("promptBelow").value = "";
+  $("promptMain").value = housePromptText || "";
+  countPrompts(); markPromptBtn();
+  $("promptSaved").textContent = "Cleared.";
+};
+
+// boot: load server config (gate/bitmap/marketplace/key status), then restore
+(async () => {
+  try { state.cfg = await (await fetch("/api/config")).json(); } catch { state.cfg = null; }
+  $("bmInput").max = String(maxBm());
+  markPromptBtn();
+  if (!state.history.length) setMsgsNote(introNoteHtml());
+  restoreSession();
+  // a restored token might be dead (expired / server secret changed) — verify
+  // it now so the wallet button reflects reality, not sessionStorage
+  if (state.token) await apiFetch("/api/auth/session"); // 401 path auto-resets via dropWalletSession
+  await loadPromptInfo();                               // which 📜 slots this wallet has earned
+  markPromptBtn();
+  setControls();
+  updateWalletUi();
+  refreshBalance();
+  if (state.cfg?.walletGate && !state.wallet && !state.history.length) setMsgsNote(walletHintHtml());
+})();
+</script>
+</body>
+</html>

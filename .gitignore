@@ -1,0 +1,8 @@
+node_modules/
+.env
+.jwt-secret
+.free-quota.json
+.questions.json
+.admin.json
+.system-prompt.txt
+.claims.json

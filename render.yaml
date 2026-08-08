@@ -1,0 +1,50 @@
+# Render blueprint for chat.bitmap.center — a SECOND web service alongside
+# btcmail in the same Render account (Render runs one app per service; there is
+# no way to put two apps on one instance).
+#
+# Secrets are deliberately NOT in this file: sync:false means "ask me in the
+# dashboard". Never commit the Anthropic key or the admin code.
+services:
+  - type: web
+    name: bitmap-chat
+    runtime: docker
+    plan: starter            # a persistent disk needs a paid instance
+    region: frankfurt        # match the btcmail service's region
+    branch: master
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: data
+      mountPath: /data       # everything the app must not lose on redeploy
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # ordinals.com 403s Render's datacenter IPs. Listed first anyway: the
+      # gateway loop sticks to whichever answers, so it self-heals if that ever
+      # changes, and falls straight through to xverse today.
+      - key: ORD_API
+        value: https://ordinals.com,https://ord.xverse.app
+
+      # state that must survive a deploy (all of it is on the disk above)
+      - key: ORDERS_FILE
+        value: /data/questions.json      # bought question balances + order history
+      - key: QUOTA_FILE
+        value: /data/free-quota.json     # today's free-question use per address
+      - key: ADMIN_FILE
+        value: /data/admin.json          # promo codes, granted admins, scriber registry
+      - key: CLAIMS_FILE
+        value: /data/claims.json         # manually claimed PathScribers
+      - key: PROMPT_FILE
+        value: /data/system-prompt.txt   # the admin panel's live prompt
+
+      # set in the dashboard, never in git
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ADMIN_CODE
+        sync: false
+      - key: JWT_SECRET                  # keeps wallet sign-ins alive across deploys
+        sync: false
+      - key: PAY_ADDRESS
+        sync: false

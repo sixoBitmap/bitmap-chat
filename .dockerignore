@@ -1,0 +1,23 @@
+# Never bake secrets or local state into the image. The Dockerfile does
+# `COPY . .`, so without this the real .env (with the Anthropic key), the JWT
+# secret and the local order/admin/claim files would ship inside the container.
+.env
+.env.*
+!.env.example
+.jwt-secret
+.admin.json
+.claims.json
+.questions.json
+.free-quota.json
+.system-prompt.txt
+
+node_modules
+npm-debug.log*
+
+# not needed at runtime
+test
+scripts
+.git
+.gitignore
+DEPLOY.md
+README.md

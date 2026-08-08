@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitmap Chat — Admin</title>
+<style>
+  :root{
+    --paper:#0d1117; --panel:#161b22; --panel-2:#1c2330; --ink:#e6edf3;
+    --muted:#8b949e; --line:#2d333b; --accent:#e3b341; --ok:#3fb950; --bad:#f85149; --neighbor:#58a6ff;
+  }
+  *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px;border:2px solid var(--panel)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+  body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+  header{display:flex;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+  header h1{font-size:15px;margin:0;color:var(--accent)}
+  header .who{color:var(--muted);font-size:12px}
+  .btn{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#151515;font-weight:600}
+  .btn.danger{border-color:var(--bad);color:var(--bad)}
+  .btn.small{padding:3px 8px;font-size:11.5px}
+  a{color:var(--neighbor)}
+  input,select{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 10px;font-size:13px}
+  /* login */
+  #login{max-width:420px;margin:12vh auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px}
+  #login h2{margin:0 0 4px;font-size:16px;color:var(--accent)}
+  #login p{color:var(--muted);font-size:12.5px;line-height:1.5}
+  #login input{width:100%;margin:8px 0}
+  #login .row{display:flex;gap:8px;margin-top:8px}
+  #loginMsg{min-height:18px;font-size:12.5px;margin-top:8px}
+  .err{color:var(--bad)} .ok{color:var(--ok)}
+  /* panel */
+  #panel{display:none;padding:16px;max-width:1500px;margin:0 auto}
+  #panel.on{display:block}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .tab{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 14px;cursor:pointer;font-size:13px}
+  .tab.on{border-color:var(--accent);color:var(--accent);background:rgba(227,179,65,.08)}
+  .view{display:none} .view.on{display:block}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .card .big{display:block;font-size:22px;font-weight:800;color:var(--accent);line-height:1.2}
+  .lbl,.card .lbl{color:var(--muted);font-size:11.5px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px}
+  .box h3{margin:0 0 10px;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.05em}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:middle;word-break:break-word}
+  .mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+  .pill{font-size:10.5px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+  .pill.live{color:var(--ok);border-color:var(--ok)}
+  .pill.dead{color:var(--muted)}
+  .pill.confirmed{color:var(--ok);border-color:var(--ok)}
+  .pill.pending{color:var(--accent);border-color:var(--accent)}
+  .pill.underpaid,.pill.expired{color:var(--bad);border-color:var(--bad)}
+  .formrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .formrow.lbls{align-items:flex-end}
+  .f{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted)}
+  .f input{width:100%}
+  input.lim{width:64px;padding:4px 6px;font-size:12px;text-align:center}
+  input.lim.inf{color:var(--accent)}
+  .empty{color:var(--muted);text-align:center;padding:18px;font-size:12.5px}
+  .hint{color:var(--muted);font-size:11.5px;line-height:1.5;margin:8px 0 0}
+  .owner{font-family:ui-monospace,Consolas,monospace;font-size:11px}
+  #promptText{width:100%;min-height:52vh;resize:vertical;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    color:var(--ink);padding:12px 14px;font:12.5px/1.65 ui-monospace,Consolas,monospace;white-space:pre-wrap}
+  #promptText:focus{outline:none;border-color:var(--accent)}
+  #promptText.dirty{border-color:var(--accent)}
+  .pill.custom{color:var(--accent);border-color:var(--accent)}
+  .me{color:var(--ok)}
+</style>
+</head>
+<body>
+<div id="login">
+  <h2>◼ Bitmap Chat — Admin</h2>
+  <p>Only the wallet holding <b id="gateName">114588.bitmap</b> — or an address it has granted — can open this panel, and the admin code is required as well.</p>
+  <input id="codeInput" type="password" placeholder="admin code" autocomplete="off">
+  <div class="row">
+    <button id="connectBtn" class="btn">1 · Connect wallet</button>
+    <button id="enterBtn" class="btn primary" style="flex:1">2 · Enter</button>
+  </div>
+  <div id="loginMsg"></div>
+</div>
+
+<header id="topbar" style="display:none">
+  <h1>◼ Admin</h1>
+  <span class="who" id="whoAmI"></span>
+  <span style="flex:1"></span>
+  <button id="refreshBtn" class="btn small">↻ Refresh</button>
+  <a class="btn small" href="/">← App</a>
+  <button id="logoutBtn" class="btn small danger">Lock</button>
+</header>
+
+<div id="panel">
+  <div class="tabs">
+    <button class="tab on" data-view="overview">Overview</button>
+    <button class="tab" data-view="promos">Promo codes</button>
+    <button class="tab" data-view="scribers">PathScribers</button>
+    <button class="tab" data-view="parcels">Parcels</button>
+    <button class="tab" data-view="orders">Orders</button>
+    <button class="tab" data-view="prompt">AI prompt</button>
+    <button class="tab" data-view="access">Access</button>
+  </div>
+
+  <div class="view on" id="v-overview">
+    <div class="cards" id="statCards"></div>
+    <div class="box"><h3>Payments go to</h3><div class="mono" id="payTo">…</div>
+      <p class="hint">Owner of the gate bitmap (full admin, always): <span class="mono" id="ownerAddr">…</span></p></div>
+  </div>
+
+  <div class="view" id="v-promos">
+    <div class="box">
+      <h3>Create a promo code</h3>
+      <div class="formrow lbls">
+        <label class="f" style="flex:2;min-width:180px">code<input id="pCode" placeholder="e.g. bitmap friends"></label>
+        <label class="f" style="width:104px">discount %<input id="pPct" type="number" min="1" max="100" value="50"></label>
+        <label class="f" style="width:118px">expires (days)<input id="pDays" type="number" min="0" value="0"></label>
+        <label class="f" style="width:118px">uses per wallet<input id="pPer" type="number" min="0" value="1"></label>
+        <label class="f" style="width:118px">uses in total<input id="pMax" type="number" min="0" value="0"></label>
+        <button id="pAdd" class="btn primary">Create</button>
+      </div>
+      <p class="hint">Discount in %, duration in days. <b>0 means unlimited</b> everywhere: 0 days = never expires, 0 uses = as many times as they like.
+      Default is 1 use per wallet and no overall cap. Codes are secret — they are only checked server-side and never shown to buyers.</p>
+    </div>
+    <div class="box"><h3>Codes</h3><div id="promoTable"></div></div>
+  </div>
+
+  <div class="view" id="v-scribers">
+    <div class="cards" id="scriberCards"></div>
+    <div class="box">
+      <h3>PathScriber holders</h3>
+      <div id="scriberTable" class="empty">loading…</div>
+      <div class="formrow" style="margin-top:12px">
+        <input id="sAdd" placeholder="add a mint inscription id (…i0)" style="flex:1;min-width:220px">
+        <button id="sAddBtn" class="btn">Add</button>
+      </div>
+      <p class="hint">BRC-420 mints are standalone inscriptions, so they can't be listed from ord directly. This registry is seeded with the known mints and grows automatically whenever a holder signs in — add any new one by hand here.</p>
+    </div>
+  </div>
+
+  <div class="view" id="v-parcels">
+    <div class="cards" id="parcelCards"></div>
+    <div class="box"><h3>Parcel holders</h3><div id="parcelTable" class="empty">loading…</div>
+      <p class="hint">Live from ordinals.com: children of the gate bitmap whose content is <span class="mono">x.114588.bitmap</span> with x below the block's transaction count. First claim per number wins.</p></div>
+  </div>
+
+  <div class="view" id="v-orders">
+    <div class="cards" id="orderCards"></div>
+    <div class="box"><h3>Every order</h3><div id="orderTable" class="empty">loading…</div></div>
+  </div>
+
+  <div class="view" id="v-prompt">
+    <div class="box">
+      <h3>How the AI answers <span id="promptState" class="pill dead">…</span></h3>
+      <p class="hint" style="margin-top:0">These are the instructions sent as the first system block of every question. The crawled bitmap data is appended after them automatically — you don't write it here.
+      Saving applies to the <b>next question</b>, no restart needed.</p>
+      <textarea id="promptText" spellcheck="false" placeholder="the instructions the AI follows…"></textarea>
+      <div class="formrow" style="margin:10px 0 0">
+        <button id="promptSave" class="btn primary">Save</button>
+        <button id="promptRevert" class="btn">Undo my edits</button>
+        <button id="promptDefault" class="btn danger">Restore the default</button>
+        <span style="flex:1"></span>
+        <span class="lbl" id="promptSize"></span>
+      </div>
+      <div id="promptMsg" class="hint"></div>
+      <p class="hint">This text sits inside the cached part of the request, so the first question after a save costs a little more (the cache is rewritten once) and then goes back to normal.
+      Keep the grounding rules unless you mean to change them — they are what stops the AI inventing inscription numbers and owners.</p>
+    </div>
+  </div>
+
+  <div class="view" id="v-access">
+    <div class="box">
+      <h3>Who can open this panel</h3>
+      <p class="hint" style="margin-top:0">The wallet holding the gate bitmap always can. Add other addresses below.</p>
+      <div class="formrow">
+        <input id="aAddr" placeholder="bc1… address to grant" style="flex:1;min-width:260px">
+        <button id="aAdd" class="btn primary">Grant access</button>
+      </div>
+      <div id="adminTable"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { request as walletRequest } from "https://esm.sh/sats-connect@3";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const shortAddr = (a) => (a ? `${a.slice(0, 8)}…${a.slice(-6)}` : "—");
+const shortId = (i) => (i ? `${i.slice(0, 10)}…` : "—");
+const when = (ms) => (ms ? new Date(ms).toISOString().slice(0, 16).replace("T", " ") : "—");
+const sats = (n) => `${Number(n).toLocaleString("en-US")} sats`;
+
+let token = sessionStorage.getItem("bac_admin_token") || null;
+let code = sessionStorage.getItem("bac_admin_code") || "";
+let me = null;
+
+const H = () => ({ "Content-Type": "application/json", "x-admin-code": code, ...(token ? { Authorization: `Bearer ${token}` } : {}) });
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { ...H(), ...(opts.headers || {}) } });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `request failed (${res.status})`);
+  return body;
+}
+
+// --- login ------------------------------------------------------------------
+function msg(text, cls = "") { $("loginMsg").className = cls; $("loginMsg").textContent = text; }
+
+$("connectBtn").onclick = async () => {
+  try {
+    msg("approve the connection in your wallet…");
+    const r = await walletRequest("wallet_connect", null);
+    if (r.status !== "success") throw new Error(r.error?.message || "connection rejected");
+    const ord = r.result.addresses.find((a) => a.purpose === "ordinals");
+    if (!ord) throw new Error("no ordinals address in the wallet");
+    const ch = await (await fetch("/api/auth/challenge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address: ord.address }) })).json();
+    if (!ch.nonce) throw new Error(ch.error || "challenge failed");
+    msg("sign the message to prove ownership…");
+    const sig = await walletRequest("signMessage", { address: ord.address, message: ch.message, protocol: "BIP322" });
+    if (sig.status !== "success") throw new Error(sig.error?.message || "signature rejected");
+    const out = await (await fetch("/api/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nonce: ch.nonce, signature: sig.result.signature }) })).json();
+    if (!out.token) throw new Error(out.error || "verification failed");
+    token = out.token;
+    sessionStorage.setItem("bac_admin_token", token);
+    msg(`wallet verified: ${shortAddr(out.address)} — now enter the admin code`, "ok");
+  } catch (e) { msg(e.message || String(e), "err"); }
+};
+
+$("enterBtn").onclick = () => enter($("codeInput").value.trim());
+$("codeInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("enterBtn").click(); });
+
+async function enter(c) {
+  if (!c) return msg("enter the admin code", "err");
+  if (!token) return msg("connect your wallet first (step 1)", "err");
+  code = c;
+  try {
+    const out = await api("/api/admin/login", { method: "POST", body: "{}" });
+    sessionStorage.setItem("bac_admin_code", code);
+    me = out.address;
+    $("login").style.display = "none";
+    $("topbar").style.display = "flex";
+    $("panel").classList.add("on");
+    $("whoAmI").textContent = `${shortAddr(out.address)}${out.address === out.owner ? " · gate owner" : " · granted access"}`;
+    loadAll();
+  } catch (e) { msg(e.message, "err"); }
+}
+
+$("logoutBtn").onclick = () => { sessionStorage.removeItem("bac_admin_code"); sessionStorage.removeItem("bac_admin_token"); location.reload(); };
+$("refreshBtn").onclick = () => loadAll(true);
+
+// --- tabs -------------------------------------------------------------------
+for (const t of document.querySelectorAll(".tab")) {
+  t.onclick = () => {
+    for (const x of document.querySelectorAll(".tab")) x.classList.toggle("on", x === t);
+    for (const v of document.querySelectorAll(".view")) v.classList.toggle("on", v.id === `v-${t.dataset.view}`);
+  };
+}
+
+// --- loaders ----------------------------------------------------------------
+async function loadAll(refresh = false) {
+  loadOverview();
+  loadOrders(refresh);
+  loadScribers();
+  loadParcels();
+  loadPrompt();
+}
+
+async function loadOverview() {
+  try {
+    const d = await api("/api/admin/overview");
+    const s = d.stats;
+    $("statCards").innerHTML = [
+      ["questions sold", s.questionsSold], ["orders confirmed", s.confirmed],
+      ["awaiting confirmation", s.pending], ["buyers", s.buyers],
+      ["received", `€${s.eurReceived.toFixed(2)}`], ["received", sats(s.satsReceived)],
+      ["unspent questions", s.balancesOutstanding], ["promo codes", d.promos.filter((p) => p.live).length],
+    ].map(([l, v]) => `<div class="card"><span class="big">${esc(String(v))}</span><span class="lbl">${l}</span></div>`).join("");
+    $("payTo").textContent = d.payTo;
+    $("ownerAddr").textContent = d.owner || "(could not read)";
+    $("gateName").textContent = `${d.gateBitmap}.bitmap`;
+    renderPromos(d.promos);
+    renderAdmins(d.admins, d.owner);
+  } catch (e) { $("statCards").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+}
+
+const limBox = (p, k) =>
+  `<input class="lim ${p[k] ? "" : "inf"}" type="number" min="0" step="1" value="${p[k]}" data-lim="${esc(p.code)}" data-k="${k}"
+     title="${k === "perAddress" ? "how many times ONE wallet may use this code" : "how many times it may be used in total"} — 0 = unlimited">`;
+
+function renderPromos(promos) {
+  $("promoTable").innerHTML = promos.length ? `<table>
+    <thead><tr><th>code</th><th>discount</th><th>used</th><th>per wallet</th><th>total</th><th>created</th><th>expires</th><th>state</th><th></th></tr></thead>
+    <tbody>${promos.map((p) => `<tr>
+      <td class="mono">${esc(p.code)}</td>
+      <td><b>−${p.discountPct}%</b></td>
+      <td><b>${p.uses || 0}</b>${p.maxTotal ? ` <span class="lbl">of ${p.maxTotal}</span>` : ""}</td>
+      <td>${limBox(p, "perAddress")}</td>
+      <td>${limBox(p, "maxTotal")}</td>
+      <td>${when(p.createdAt)}</td>
+      <td>${p.expiresAt ? when(p.expiresAt) : "never"}</td>
+      <td><span class="pill ${p.live ? "live" : "dead"}">${p.live ? "active" : (p.active ? "expired" : "paused")}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn small" data-toggle="${esc(p.code)}" data-active="${p.active ? 0 : 1}">${p.active ? "pause" : "resume"}</button>
+        <button class="btn small danger" data-del="${esc(p.code)}">delete</button>
+      </td></tr>`).join("")}</tbody></table>
+    <p class="hint">“per wallet” = how many times one address may redeem the code, “total” = across everyone. <b>0 = unlimited (∞)</b>. Edits save as soon as you leave the box.</p>`
+    : `<div class="empty">no codes yet</div>`;
+  for (const inp of $("promoTable").querySelectorAll("[data-lim]")) {
+    inp.onchange = async () => {
+      const row = inp.closest("tr");
+      const body = JSON.stringify({
+        perAddress: row.querySelector('[data-k="perAddress"]').value,
+        maxTotal: row.querySelector('[data-k="maxTotal"]').value,
+      });
+      try { renderPromos((await api(`/api/admin/promos/${encodeURIComponent(inp.dataset.lim)}/limits`, { method: "POST", body })).promos); }
+      catch (e) { alert(e.message); }
+    };
+  }
+  for (const b of $("promoTable").querySelectorAll("[data-toggle]")) {
+    b.onclick = async () => { try { renderPromos((await api(`/api/admin/promos/${encodeURIComponent(b.dataset.toggle)}/active`, { method: "POST", body: JSON.stringify({ active: b.dataset.active === "1" }) })).promos); } catch (e) { alert(e.message); } };
+  }
+  for (const b of $("promoTable").querySelectorAll("[data-del]")) {
+    b.onclick = async () => {
+      if (!confirm(`Delete the code "${b.dataset.del}"? Buyers using it will lose the discount.`)) return;
+      try { renderPromos((await api(`/api/admin/promos/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" })).promos); } catch (e) { alert(e.message); }
+    };
+  }
+}
+
+$("pAdd").onclick = async () => {
+  try {
+    const promos = (await api("/api/admin/promos", { method: "POST", body: JSON.stringify({
+      code: $("pCode").value, discountPct: $("pPct").value, days: $("pDays").value,
+      perAddress: $("pPer").value, maxTotal: $("pMax").value,
+    }) })).promos;
+    $("pCode").value = "";
+    renderPromos(promos);
+  } catch (e) { alert(e.message); }
+};
+
+function renderAdmins(admins, owner) {
+  $("adminTable").innerHTML = `<table>
+    <thead><tr><th>address</th><th>role</th><th></th></tr></thead>
+    <tbody>
+      <tr><td class="owner">${esc(owner || "—")}</td><td><span class="pill live">gate owner</span></td><td></td></tr>
+      ${admins.map((a) => `<tr><td class="owner">${esc(a)}${a === me ? ' <span class="me">(you)</span>' : ""}</td><td><span class="pill">granted</span></td>
+        <td style="text-align:right"><button class="btn small danger" data-revoke="${esc(a)}">revoke</button></td></tr>`).join("")}
+    </tbody></table>`;
+  for (const b of $("adminTable").querySelectorAll("[data-revoke]")) {
+    b.onclick = async () => {
+      if (!confirm(`Revoke admin access for ${b.dataset.revoke}?`)) return;
+      try { renderAdmins((await api(`/api/admin/admins/${encodeURIComponent(b.dataset.revoke)}`, { method: "DELETE" })).admins, owner); } catch (e) { alert(e.message); }
+    };
+  }
+}
+
+$("aAdd").onclick = async () => {
+  try {
+    const d = await api("/api/admin/admins", { method: "POST", body: JSON.stringify({ address: $("aAddr").value }) });
+    $("aAddr").value = "";
+    loadOverview();
+    void d;
+  } catch (e) { alert(e.message); }
+};
+
+async function loadScribers() {
+  try {
+    const d = await api("/api/admin/pathscribers");
+    $("scriberCards").innerHTML = [["PathScribers known", d.total], ["distinct holders", d.holders]]
+      .map(([l, v]) => `<div class="card"><span class="big">${v}</span><span class="lbl">${l}</span></div>`).join("");
+    $("scriberTable").className = "";
+    $("scriberTable").innerHTML = holderTable(d.rows);
+    wireUnclaim($("scriberTable"));
+  } catch (e) { $("scriberTable").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+}
+
+$("sAddBtn").onclick = async () => {
+  try {
+    const d = await api("/api/admin/pathscribers", { method: "POST", body: JSON.stringify({ id: $("sAdd").value.trim() }) });
+    $("sAdd").value = "";
+    $("scriberTable").innerHTML = holderTable(d.rows);
+    wireUnclaim($("scriberTable"));
+  } catch (e) { alert(e.message); }
+};
+
+async function loadParcels() {
+  try {
+    const d = await api("/api/admin/parcels");
+    $("parcelCards").innerHTML = [["parcels inscribed", `${d.minted} / ${d.txCount}`], ["distinct holders", d.holders]]
+      .map(([l, v]) => `<div class="card"><span class="big">${v}</span><span class="lbl">${l}</span></div>`).join("");
+    $("parcelTable").className = "";
+    $("parcelTable").innerHTML = holderTable(d.rows, true);
+  } catch (e) { $("parcelTable").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+}
+
+function holderTable(rows, isParcel = false) {
+  if (!rows.length) return `<div class="empty">nothing yet</div>`;
+  const claims = !isParcel && rows.some((r) => r.claim); // only PathScribers can be claimed by hand
+  return `<table>
+    <thead><tr>${isParcel ? "<th>parcel</th>" : ""}<th>inscription</th><th>#</th><th>inscribed</th><th>owner</th>${claims ? "<th>claimed by</th>" : ""}</tr></thead>
+    <tbody>${rows.map((r) => `<tr>
+      ${isParcel ? `<td class="mono">${esc(r.parcel || "—")}</td>` : ""}
+      <td><a class="mono" href="https://ordinals.com/inscription/${encodeURIComponent(r.id)}" target="_blank" rel="noopener">${shortId(r.id)}↗</a></td>
+      <td>${r.number ?? "—"}</td>
+      <td>${r.timestamp ? new Date(r.timestamp * 1000).toISOString().slice(0, 10) : "—"}</td>
+      <td class="owner">${esc(r.owner || "—")}</td>
+      ${claims ? `<td>${r.claim
+        ? `<span class="owner">${esc(shortAddr(r.claim.address))}</span> <span class="lbl">${when(r.claim.at)}</span>
+           <button class="btn small danger" data-unclaim="${esc(r.id)}" title="drop the manual claim — the mint stays listed">×</button>`
+        : `<span class="lbl">found by scan</span>`}</td>` : ""}
+    </tr>`).join("")}</tbody></table>`;
+}
+
+// Drop a manual claim (holders whose wallet scan finds the mint keep access).
+function wireUnclaim(container) {
+  for (const b of container.querySelectorAll("[data-unclaim]")) {
+    b.onclick = async () => {
+      if (!confirm("Drop this manual claim? The holder keeps access if their wallet scan still finds the PathScriber.")) return;
+      try {
+        const d = await api(`/api/admin/pathscribers/${encodeURIComponent(b.dataset.unclaim)}/claim`, { method: "DELETE" });
+        $("scriberTable").innerHTML = holderTable(d.rows);
+        wireUnclaim($("scriberTable"));
+      } catch (e) { alert(e.message); }
+    };
+  }
+}
+
+async function loadOrders(refresh = false) {
+  try {
+    const d = await api(`/api/admin/orders${refresh ? "?refresh=1" : ""}`);
+    $("orderCards").innerHTML = [["orders", d.stats.orders], ["confirmed", d.stats.confirmed], ["pending", d.stats.pending], ["questions sold", d.stats.questionsSold]]
+      .map(([l, v]) => `<div class="card"><span class="big">${v}</span><span class="lbl">${l}</span></div>`).join("");
+    $("orderTable").className = "";
+    $("orderTable").innerHTML = d.orders.length ? `<table>
+      <thead><tr><th>date</th><th>buyer</th><th>questions</th><th>paid</th><th>promo</th><th>status</th><th>tx</th></tr></thead>
+      <tbody>${d.orders.map((o) => `<tr>
+        <td>${when(o.createdAt)}</td>
+        <td class="owner">${esc(shortAddr(o.address))}</td>
+        <td><b>+${o.questions}</b></td>
+        <td>${sats(o.sats)}<br><span class="lbl">≈ €${o.eur.toFixed(2)}</span></td>
+        <td>${o.promoCode ? `<span class="mono">${esc(o.promoCode)}</span> <span class="lbl">−${o.discountPct}%</span>` : "—"}</td>
+        <td><span class="pill ${o.status}">${esc(o.status)}</span>${o.confirmations ? ` <span class="lbl">${o.confirmations} conf</span>` : ""}${o.note ? `<br><span class="lbl" style="color:var(--bad)">${esc(o.note)}</span>` : ""}</td>
+        <td>${o.txid ? `<a class="mono" href="https://mempool.space/tx/${o.txid}" target="_blank" rel="noopener">${shortId(o.txid)}↗</a>` : "—"}</td>
+      </tr>`).join("")}</tbody></table>` : `<div class="empty">no orders yet</div>`;
+  } catch (e) { $("orderTable").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+}
+
+// --- the AI's instructions ---------------------------------------------------
+let promptInfo = null;    // the last state the server reported
+let promptSaved = null;   // the text it currently has
+
+const promptDirty = () => promptSaved !== null && $("promptText").value !== promptSaved;
+
+function paintPrompt(d, note = "", cls = "") {
+  if (d) { promptInfo = d; promptSaved = d.text; }
+  const dirty = promptDirty();
+  const isDefault = promptInfo ? promptInfo.isDefault : true;
+  const pill = $("promptState");
+  pill.className = `pill ${dirty ? "custom" : isDefault ? "dead" : "live"}`;
+  pill.textContent = dirty ? "unsaved edits" : isDefault ? "the default prompt" : `edited ${when(promptInfo.savedAt)}`;
+  const len = $("promptText").value.length;
+  $("promptSize").textContent = `${len.toLocaleString("en-US")} characters · ≈${Math.round(len / 3.5).toLocaleString("en-US")} tokens${promptInfo?.max ? ` · max ${promptInfo.max.toLocaleString("en-US")}` : ""}`;
+  $("promptText").classList.toggle("dirty", dirty);
+  $("promptMsg").innerHTML = note ? `<span class="${cls}">${esc(note)}</span>` : "";
+}
+
+async function loadPrompt() {
+  try {
+    const d = await api("/api/admin/prompt");
+    // never throw away something the admin is in the middle of typing
+    if (!promptDirty()) $("promptText").value = d.text;
+    paintPrompt(d, promptDirty() ? "you have unsaved edits — “Undo my edits” brings back the saved text" : "");
+  } catch (e) { paintPrompt(null, e.message, "err"); }
+}
+
+$("promptText").addEventListener("input", () => paintPrompt(null));
+
+$("promptSave").onclick = async () => {
+  const btn = $("promptSave");
+  btn.disabled = true;
+  try {
+    const d = await api("/api/admin/prompt", { method: "POST", body: JSON.stringify({ text: $("promptText").value }) });
+    $("promptText").value = d.text;
+    paintPrompt(d, d.isDefault ? "that is the default text, so the default is back in use" : "saved — the next question uses it", "ok");
+  } catch (e) { paintPrompt(null, e.message, "err"); }
+  finally { btn.disabled = false; }
+};
+
+$("promptRevert").onclick = () => {
+  if (promptSaved === null) return;
+  $("promptText").value = promptSaved;
+  paintPrompt(null, "back to the saved text");
+};
+
+$("promptDefault").onclick = async () => {
+  if (!confirm("Throw away the custom prompt and go back to the built-in one?")) return;
+  try {
+    const d = await api("/api/admin/prompt", { method: "DELETE" });
+    $("promptText").value = d.text;
+    paintPrompt(d, "the default prompt is back", "ok");
+  } catch (e) { paintPrompt(null, e.message, "err"); }
+};
+
+// boot: if the panel isn't enabled say so; if we still hold a session, resume
+(async () => {
+  try {
+    const cfg = await (await fetch("/api/admin/enabled")).json();
+    $("gateName").textContent = `${cfg.gateBitmap}.bitmap`;
+    if (!cfg.enabled) {
+      $("login").innerHTML = `<h2>◼ Admin</h2><p>The admin panel is disabled. Set <span class="mono">ADMIN_CODE</span> in the server's <span class="mono">.env</span> (at least 4 characters) and restart to enable it.</p>`;
+      return;
+    }
+  } catch {}
+  if (token && code) enter(code);
+})();
+</script>
+</body>
+</html>
