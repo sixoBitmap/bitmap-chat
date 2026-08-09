@@ -120,6 +120,7 @@
      the tree even when a row has none of them (.off keeps the space) */
   .frow .rbadge{width:34px;text-align:center;color:var(--rein);font-size:10px;border:1px solid var(--rein);border-radius:4px;padding:0 4px;flex:none}
   .frow .cbadge{width:34px;text-align:center;color:var(--accent);font-size:10px;border:1px solid var(--accent);border-radius:4px;padding:0 4px;flex:none}
+  .frow .cbadge .bsym{color:var(--ink);font-style:normal}   /* the glyph white, the count gold */
   .frow .pbadge{width:34px;text-align:center;color:var(--neighbor);font-size:10px;border:1px solid var(--neighbor);border-radius:4px;padding:0 4px;flex:none}
   .frow .endpad{width:56px;flex:none;display:flex;justify-content:center;align-items:center}
   /* "+" on rows you own — lives inside the existing 56px gutter, so no column moves */
@@ -1399,7 +1400,7 @@ function makeRow(node, path, opts = {}) {
     <span class="fdate">${node.timestamp ? new Date(node.timestamp * 1000).toISOString().slice(0, 10) : ""}</span>
     <span class="chip">${escapeHtml(node.delegate ? "delegate" : (node.content_type || "?").split(";")[0])}</span>
     <span class="rbadge${reinIds.length ? "" : " off"}" title="${reinIds.length} reinscription${reinIds.length === 1 ? "" : "s"} on this sat">↻${reinIds.length || ""}</span>
-    <span class="cbadge${childIds.length ? "" : " off"}" title="${childIds.length} child${childIds.length === 1 ? "" : "ren"}">▢${childIds.length || ""}</span>
+    <span class="cbadge${childIds.length ? "" : " off"}" title="${childIds.length} child${childIds.length === 1 ? "" : "ren"}"><i class="bsym">▢</i>${childIds.length || ""}</span>
     <span class="pbadge${parentIds.length > 1 ? "" : " off"}"${parentIds.length > 1 ? ` title="${parentIds.length} parents:&#10;${escapeHtml(parentIds.map((p) => nodeLabel(treeIdx.byId.get(p))).join("\n"))}"` : ""}>${parentIds.length > 1 ? `⬆${parentIds.length}` : "⬆"}</span>
     <span class="endpad">${ownedByMe(node) && state.token ? `<button class="rowins" title="yours — inscribe a reinscription or a child from it">+</button>` : ""}</span>
   `;
