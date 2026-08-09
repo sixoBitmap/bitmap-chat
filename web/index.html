@@ -475,6 +475,7 @@
   .mktSell select,.mktSell input{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
     border-radius:7px;padding:5px 8px;font-size:12px;min-width:0}
   .mktSell select{flex:1} .mktSell input{width:110px}
+  .mktNote{margin-top:7px;line-height:1.45;border-left:2px solid var(--line);padding-left:8px}
   #mktMsg{margin-top:6px;line-height:1.4}
   #mktMsg.ok{color:var(--ok)} #mktMsg.err{color:var(--bad)}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -694,6 +695,7 @@
               <input id="mktPrice" type="number" min="1000" step="1000" placeholder="price in sats">
               <button id="mktListBtn" class="btn small primary">List</button>
             </div>
+            <div class="lbl mktNote" id="mktNote" hidden>Your wallet will show red warnings about <b>SIGHASH_SINGLE</b> and <b>ANYONECANPAY</b>. That is normal here and it is what makes a listing possible: your signature locks only "pay me this much for this parcel", so a buyer can add their own payment later. Nothing moves until someone buys, the parcel stays in your wallet, and you can withdraw the listing at any time.</div>
             <div class="lbl" id="mktMsg"></div>
           </div>
           <div class="gcol">
@@ -2518,6 +2520,7 @@ async function loadMarket() {
     const listed = new Set(live.map((l) => l.inscriptionId));
     const sellable = (state.wallet?.parcels || []).filter((p) => !listed.has(p.id));
     $("mktSell").hidden = !sellable.length;
+    $("mktNote").hidden = !sellable.length;
     $("mktWhich").innerHTML = sellable.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.text || p.id.slice(0, 10))}</option>`).join("");
   } catch (e) { $("mktList").innerHTML = `<div class="lbl">${escapeHtml(e.message || "market unavailable")}</div>`; }
 }
