@@ -18,11 +18,24 @@
   ::-webkit-scrollbar-corner{background:transparent}
   html,body{height:100%}
   body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column}
+  /* [hidden] is a UA rule at the lowest specificity, so ANY class here that
+     sets display (.iconGhost, .pickedCard, .pblock…) would silently outrank it
+     and show an element the JS believes is hidden. Settle it once, globally. */
+  [hidden]{display:none !important}
   header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
   header h1{font-size:16px;margin:0 8px 0 0;color:var(--accent);white-space:nowrap}
   header input[type=number]{width:130px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 10px;font-size:14px}
-  #imgToggle{padding:6px 9px}
+  /* bitmap number + images toggle + search, joined into one control */
+  .searchGroup{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:9px;
+    background:var(--panel-2);overflow:hidden;transition:border-color .15s,box-shadow .15s}
+  .searchGroup:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(227,179,65,.15)}
+  .searchGroup input[type=number]{width:112px;border:0;border-radius:0;background:transparent;outline:none;margin:0}
+  /* margin:0 matters — .iconbtn ships a margin-left that would split the seam */
+  .searchGroup .btn{border:0;border-radius:0;border-left:1px solid var(--line);margin:0;display:grid;place-items:center}
+  #imgToggle{padding:6px 10px}
   #imgToggle svg{width:16px;height:16px;display:block}
+  #exploreBtn{padding:6px 12px}
+  #exploreBtn svg{width:17px;height:17px;display:block}
   /* the 📜 button needs its own size rule — an inline <svg> with no width
      collapses to 0x0, which is exactly what happened the first time */
   #promptBtn{padding:6px 9px}
@@ -119,8 +132,8 @@
   /* one badge per relationship, each a fixed width so the columns line up down
      the tree even when a row has none of them (.off keeps the space) */
   .frow .rbadge{width:34px;text-align:center;color:var(--rein);font-size:10px;border:1px solid var(--rein);border-radius:4px;padding:0 4px;flex:none}
-  .frow .cbadge{width:34px;text-align:center;color:var(--accent);font-size:10px;border:1px solid var(--accent);border-radius:4px;padding:0 4px;flex:none}
-  .frow .cbadge .bsym{color:var(--ink);font-style:normal}   /* the glyph white, the count gold */
+  .frow .cbadge{width:34px;text-align:center;color:var(--ink);font-size:10px;border:1px solid rgba(230,237,243,.5);border-radius:4px;padding:0 4px;flex:none}
+  .frow .cbadge .bsym{font-style:normal}   /* <i> would italicise the square */
   .frow .pbadge{width:34px;text-align:center;color:var(--neighbor);font-size:10px;border:1px solid var(--neighbor);border-radius:4px;padding:0 4px;flex:none}
   .frow .endpad{width:56px;flex:none;display:flex;justify-content:center;align-items:center}
   /* "+" on rows you own — lives inside the existing 56px gutter, so no column moves */
@@ -271,9 +284,6 @@
   #inscPanel{position:relative;width:min(940px,96vw);max-height:92vh;overflow-y:auto;background:var(--panel);
     border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px #000c}
   #inscPanel h3{margin:0 0 10px;font-size:14px;color:var(--accent)}
-  /* [hidden] is a UA rule at the lowest specificity — every `display:flex` class
-     in this panel would silently outrank it and show a hidden block anyway */
-  #inscPanel [hidden]{display:none !important}
   #inscPanel .row{display:flex;gap:8px;align-items:center;margin-top:12px}
   #inscPanel .lbl{color:var(--muted);font-size:11.5px}
   #inscPanel select,#inscPanel input[type=number]{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
@@ -466,6 +476,7 @@
 <body>
 <header>
   <h1>◼ Bitmap Chat</h1>
+  <div class="searchGroup">
   <input id="bmInput" type="number" min="0" max="941999" placeholder="bitmap #">
   <button id="imgToggle" class="btn iconbtn" title="">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -475,7 +486,12 @@
       <line class="slash" x1="3" y1="3" x2="21" y2="21"/>
     </svg>
   </button>
-  <button id="exploreBtn" class="btn primary">Explore</button>
+  <button id="exploreBtn" class="btn primary" title="Explore this bitmap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"/><path d="m20 20-4.35-4.35"/>
+    </svg>
+  </button>
+  </div>
   <span id="crawlInfo" style="color:var(--muted);font-size:12.5px"></span>
   <span style="flex:1"></span>
   <button id="bugBtn" class="iconGhost" title="Report a bug" hidden>
@@ -495,7 +511,7 @@
     </svg>
   </button>
   <button id="walletBtn" class="btn">Connect wallet</button>
-  <button id="ordersBtn" class="btn" title="Your orders and questions">Orders</button>
+  <button id="ordersBtn" class="btn" title="Your questions — bought, free today, and past orders">Questions</button>
   <button id="settingsBtn" class="btn" title="Settings — API key, questions, model">⚙</button>
 </header>
 <div id="usageWrap">
@@ -741,7 +757,7 @@
 <div id="ordersWrap">
   <div id="ordersPanel">
     <button id="closeOrdersBtn" class="winClose" title="Close">✕</button>
-    <h3>Orders <span class="addr" id="ordersAddr"></span> <button id="ordersRefresh" class="btn small iconbtn" title="Re-check payments">↻</button></h3>
+    <h3>Questions <span class="addr" id="ordersAddr"></span> <button id="ordersRefresh" class="btn small iconbtn" title="Re-check payments">↻</button></h3>
     <div class="oSummary">
       <div class="oCard"><span class="big" id="oBal">0</span><span class="dim">questions available</span></div>
       <div class="oCard" title="1 free question a day, +1 for each PathScriber and 114588 parcel you hold"><span class="big" id="oFree">–</span><span class="dim">free question today</span></div>
@@ -1844,13 +1860,17 @@ const walletHintHtml = () =>
 function updateWalletUi() {
   const w = state.wallet;
   // address button = who you are + which mode; Orders button = how many questions
-  $("walletBtn").textContent = w ? `${w.address.slice(0, 6)}…${w.address.slice(-4)}${useKeyMode() ? " · key" : " · questions"}` : "Connect wallet";
+  $("walletBtn").textContent = w ? `${w.address.slice(0, 6)}…${w.address.slice(-4)}` : "Connect wallet";
   $("walletBtn").classList.toggle("setok", !!w); // green = signed in
   // reporting a bug needs a proven wallet — no session, no icon
   $("bugBtn").hidden = !state.token;
   if (!state.token && !$("bugPop").hidden) $("bugPop").hidden = true;
   $("ordersBtn").style.display = w ? "" : "none";
-  $("ordersBtn").textContent = `Orders | ${state.balance.questions + state.balance.freeLeft}`;
+  // "Questions | 3 | 🎁1" — a count that is zero is left out entirely
+  $("ordersBtn").textContent = ["Questions",
+    state.balance.questions > 0 ? String(state.balance.questions) : null,
+    state.balance.freeLeft > 0 ? `🎁${state.balance.freeLeft}` : null,
+  ].filter(Boolean).join(" | ");
   renderChatStatus();
 }
 
