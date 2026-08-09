@@ -1415,8 +1415,8 @@ function makeRow(node, path, opts = {}) {
     <span class="lgroup"><span class="lbl">${escapeHtml(nodeLabel(node))}</span>${node.delegate ? `<span class="dlg" title="delegate inscription — displays the content of ${escapeHtml(node.delegate)}">⧉</span>` : ""}</span>
     <span class="fdate">${node.timestamp ? new Date(node.timestamp * 1000).toISOString().slice(0, 10) : ""}</span>
     <span class="chip">${escapeHtml(node.delegate ? "delegate" : (node.content_type || "?").split(";")[0])}</span>
-    <span class="rbadge${reinIds.length ? "" : " off"}" title="${reinIds.length} reinscription${reinIds.length === 1 ? "" : "s"} on this sat">↻${reinIds.length || ""}</span>
     <span class="cbadge${childIds.length ? "" : " off"}" title="${childIds.length} child${childIds.length === 1 ? "" : "ren"}"><i class="bsym">▢</i>${childIds.length || ""}</span>
+    <span class="rbadge${reinIds.length ? "" : " off"}" title="${reinIds.length} reinscription${reinIds.length === 1 ? "" : "s"} on this sat">↻${reinIds.length || ""}</span>
     <span class="pbadge${parentIds.length > 1 ? "" : " off"}"${parentIds.length > 1 ? ` title="${parentIds.length} parents:&#10;${escapeHtml(parentIds.map((p) => nodeLabel(treeIdx.byId.get(p))).join("\n"))}"` : ""}>${parentIds.length > 1 ? `⬆${parentIds.length}` : "⬆"}</span>
     <span class="endpad">${ownedByMe(node) && state.token ? `<button class="rowins" title="yours — inscribe a reinscription or a child from it">+</button>` : ""}</span>
   `;
