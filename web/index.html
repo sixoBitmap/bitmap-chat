@@ -29,6 +29,8 @@
   .searchGroup{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:9px;
     background:var(--panel-2);overflow:hidden;transition:border-color .15s,box-shadow .15s}
   .searchGroup:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(227,179,65,.15)}
+  .searchGroup.locked{opacity:.55}
+  .searchGroup.locked:focus-within{border-color:var(--line);box-shadow:none}
   .searchGroup input[type=number]{width:112px;border:0;border-radius:0;background:transparent;outline:none;margin:0}
   /* margin:0 matters — .iconbtn ships a margin-left that would split the seam */
   .searchGroup .btn{border:0;border-radius:0;border-left:1px solid var(--line);margin:0;display:grid;place-items:center}
@@ -1621,7 +1623,10 @@ function setControls() {
   const gateLocked = !!state.cfg?.walletGate && !state.wallet?.unlocked && !hasCredit();
   $("bmInput").disabled = gateLocked;
   $("bmInput").placeholder = gateLocked ? "via wallet ↦" : "bitmap #";
-  $("exploreBtn").disabled = state.crawling;
+  // nothing in the search group means anything while the number can't be typed
+  $("exploreBtn").disabled = gateLocked || state.crawling;
+  $("imgToggle").disabled = gateLocked;
+  document.querySelector(".searchGroup").classList.toggle("locked", gateLocked);
   $("chatInput").disabled = !state.ready || state.streaming;
   $("sendBtn").disabled = !state.ready || state.streaming;
   $("newChatBtn").disabled = state.streaming || (!state.ready && !state.history.length);
