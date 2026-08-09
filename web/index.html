@@ -23,6 +23,10 @@
   header input[type=number]{width:130px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 10px;font-size:14px}
   #imgToggle{padding:6px 9px}
   #imgToggle svg{width:16px;height:16px;display:block}
+  /* the 📜 button needs its own size rule — an inline <svg> with no width
+     collapses to 0x0, which is exactly what happened the first time */
+  #promptBtn{padding:6px 9px}
+  #promptBtn svg{width:17px;height:17px;display:block}
   #imgToggle .slash{display:none;stroke:var(--bad)}
   #imgToggle.off{border-color:var(--bad);color:var(--bad)}
   #imgToggle.off .slash{display:block}
@@ -32,12 +36,18 @@
   .btn:disabled{opacity:.45;cursor:not-allowed}
   .btn.small{padding:4px 9px;font-size:12px}
   #progress{display:none;padding:7px 14px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:13px}
-  #progress.on{display:flex;gap:10px;align-items:center}
-  #progress .bar{flex:1;height:4px;background:var(--panel-2);border-radius:2px;overflow:hidden;position:relative}
-  #progress .bar i{position:absolute;inset:0;width:35%;background:var(--accent);border-radius:2px;animation:slide 1.2s ease-in-out infinite alternate}
-  #progress.done .bar i{width:100%;animation:none;background:var(--ok)}
+  /* the same 3fr 2fr split as <main>, so the cubes begin exactly where the
+     family tree pane begins instead of floating at the far right */
+  #progress.on{display:grid;grid-template-columns:3fr 2fr;gap:10px;align-items:center}
+  @media (max-width:900px){ #progress.on{grid-template-columns:1fr auto} }
   #progress.err{color:var(--bad)}
-  @keyframes slide{from{left:0}to{left:65%}}
+  /* loading = six orange cubes that fill and empty, side to side, 0.6s a step */
+  .cubes{display:flex;gap:6px;align-items:center}
+  .cubes i{width:12px;height:12px;border-radius:3px;background:var(--panel-2);
+    border:1px solid var(--line);transition:background .18s ease,border-color .18s ease,transform .18s ease}
+  .cubes i.on{background:var(--accent);border-color:var(--accent);transform:scale(1.08)}
+  /* once the crawl finishes (or fails) the cubes have nothing left to say */
+  #progress.done .cubes,#progress.err .cubes{display:none}
   main{flex:1;display:grid;grid-template-columns:3fr 2fr;min-height:0}
   @media (max-width:900px){ main{grid-template-columns:1fr;grid-template-rows:1fr 1fr} }
   /* chat pane */
@@ -86,8 +96,12 @@
   .frow .chip{width:88px;text-align:center;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:10px;border:1px solid var(--line);border-radius:4px;padding:0 4px;flex:none}
   .frow .cnt{width:58px;text-align:center;color:var(--muted);font-size:10px;border:1px solid var(--line);border-radius:4px;padding:0 4px;flex:none}
   .frow .pbadge{width:34px;text-align:center;color:var(--neighbor);font-size:10px;border:1px solid var(--neighbor);border-radius:4px;padding:0 4px;flex:none}
-  .frow .endpad{width:56px;flex:none}
-  .frow .own{flex:none;width:15px;height:15px;border-radius:50%;background:var(--ok);color:#06230f;font-size:9.5px;font-weight:800;display:grid;place-items:center}
+  .frow .endpad{width:56px;flex:none;display:flex;justify-content:center;align-items:center}
+  /* "+" on rows you own — lives inside the existing 56px gutter, so no column moves */
+  .frow .rowins{flex:none;width:18px;height:18px;padding:0;line-height:1;border-radius:5px;border:1px solid var(--accent);
+    background:transparent;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;opacity:.5;transition:opacity .12s,background .12s}
+  .frow:hover .rowins{opacity:1}
+  .frow .rowins:hover{background:var(--accent);color:#151515}
   .frow .off{visibility:hidden}
   .fstub{color:var(--muted);font-size:11px;padding:2px 6px 2px 20px;font-style:italic}
   .fsep{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin:10px 0 4px;padding:4px 6px;border-top:1px dashed var(--line)}
@@ -162,9 +176,11 @@
   .feeCard.fast.on{background:rgba(240,136,62,.08);border-color:#f0883e}
   .feeSlideWrap{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:12px 14px 8px;background:var(--paper)}
   .feeSlide{flex:1;min-width:0;position:relative;padding-bottom:16px}
-  #feeRange{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:3px;background:var(--line);outline:none;margin:6px 0 0;cursor:pointer}
-  #feeRange::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);border:0;cursor:grab;box-shadow:0 0 0 3px rgba(227,179,65,.2)}
-  #feeRange::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:0;cursor:grab}
+  /* both fee sliders — buy panel and inscribe popup. Keep the ids together:
+     an unlisted range input falls back to the browser's own white track. */
+  #feeRange,#inscFeeRange{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:3px;background:var(--line);outline:none;margin:6px 0 0;cursor:pointer}
+  #feeRange::-webkit-slider-thumb,#inscFeeRange::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);border:0;cursor:grab;box-shadow:0 0 0 3px rgba(227,179,65,.2)}
+  #feeRange::-moz-range-thumb,#inscFeeRange::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:0;cursor:grab}
   .feeTicks{position:absolute;left:0;right:0;top:16px;height:16px}
   .feeTicks span{position:absolute;transform:translateX(-50%);font-size:10px;color:var(--muted);cursor:pointer;user-select:none}
   .feeTicks span::before{content:"";position:absolute;left:50%;top:-8px;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--line)}
@@ -223,6 +239,104 @@
   .btn.danger{border-color:var(--bad);color:var(--bad)}
   /* green "configured" state for the header icons (⚙ / wallet address) */
   .btn.setok{border-color:var(--ok);color:var(--ok)}
+  /* inscribe popup */
+  #inscWrap{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:60}
+  #inscWrap.on{display:flex}
+  #inscPanel{position:relative;width:min(940px,96vw);max-height:92vh;overflow-y:auto;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px #000c}
+  #inscPanel h3{margin:0 0 10px;font-size:14px;color:var(--accent)}
+  /* [hidden] is a UA rule at the lowest specificity — every `display:flex` class
+     in this panel would silently outrank it and show a hidden block anyway */
+  #inscPanel [hidden]{display:none !important}
+  #inscPanel .row{display:flex;gap:8px;align-items:center;margin-top:12px}
+  #inscPanel .lbl{color:var(--muted);font-size:11.5px}
+  #inscPanel select,#inscPanel input[type=number]{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    border-radius:7px;padding:5px 8px;font-size:12.5px}
+  /* the anchor — always on screen, this is what you are inscribing from */
+  .inscRef{position:sticky;top:0;z-index:1;background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:9px;padding:9px 12px;margin-bottom:4px;font-size:12px;line-height:1.5;display:flex;gap:12px;align-items:center}
+  .inscRef .refMain{flex:1;min-width:0}
+  .inscRef .id{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--muted);word-break:break-all}
+  /* what the inscription you clicked actually shows, at the height of this box */
+  .refPrev{flex:none;width:62px;height:62px;border:1px solid var(--line);border-radius:8px;background:#0a0d12;pointer-events:none}
+  /* step 1 spans the top, then content on the left and parents / sats / fee
+     stacked on the right, then the review across the bottom */
+  /* stretch, not start: the content block matches the height of the whole
+     right-hand stack, and its editor grows to fill whatever that turns out to be */
+  .inscCols{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
+  .inscCols > .pblock{margin-top:12px;display:flex;flex-direction:column}
+  .inscPane{flex:1;display:flex;flex-direction:column;min-height:0}
+  #inscText{flex:1}
+  /* the column itself carries the top margin, so both sides start on the same
+     line and the two columns end up exactly the same height */
+  .inscRight{display:flex;flex-direction:column;min-width:0;margin-top:12px}
+  .inscRight > .pblock{margin-top:12px}
+  .inscRight > .pblock:first-child{margin-top:0}
+  @media (max-width:820px){ .inscCols{grid-template-columns:1fr} }
+  .inscPick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .inscPick button{text-align:left;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;
+    color:var(--ink);cursor:pointer;display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+  .inscPick button span{color:var(--muted);font-size:11px;line-height:1.4}
+  .inscPick button:hover{border-color:var(--accent)}
+  .inscPick button.on{border-color:var(--accent);background:rgba(227,179,65,.08)}
+  .inscTabs{display:flex;gap:6px;margin-bottom:8px}
+  .inscTabs button{background:var(--panel-2);border:1px solid var(--line);color:var(--muted);border-radius:999px;
+    padding:4px 12px;cursor:pointer;font-size:12px}
+  .inscTabs button.on{border-color:var(--accent);color:var(--accent);background:rgba(227,179,65,.08)}
+  .inscTabs .metaBtn{margin-left:auto}
+  #inscMetaBlock{margin-top:8px;flex:none}
+  #inscMetaBlock textarea{width:100%;min-height:56px;resize:vertical;background:var(--paper);border:1px solid var(--line);
+    border-radius:8px;color:var(--ink);padding:8px 10px;font:12.5px/1.6 ui-monospace,Consolas,monospace;outline:none}
+  #inscMetaBlock textarea:focus{border-color:var(--accent)}
+  #inscMetaHint{margin-top:4px}
+  .inscPane textarea{width:100%;min-height:96px;resize:vertical;background:var(--paper);border:1px solid var(--line);
+    border-radius:8px;color:var(--ink);padding:8px 10px;font:12.5px/1.6 ui-monospace,Consolas,monospace;outline:none}
+  .inscRow{display:flex;gap:8px;align-items:center;margin-top:7px}
+  .inscP{display:flex;gap:7px;align-items:center;margin-bottom:7px;font-size:12px}
+  .inscP .num{flex:none;width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--muted);
+    font-size:10.5px;font-weight:700;display:grid;place-items:center}
+  .inscP.anchor .num{background:var(--accent);color:#151515}
+  .inscP .who{font-family:ui-monospace,Consolas,monospace;font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+  .inscP .tagm{flex:none;font-size:11px} .inscP .ok{color:var(--ok)} .inscP .no{color:var(--bad)}
+  /* themed id field — same pill language as the wallet popup */
+  .idField{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;background:var(--paper);
+    padding:4px 6px 4px 12px;transition:border-color .15s,box-shadow .15s}
+  .idField:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(227,179,65,.18)}
+  .idField.good{border-color:var(--ok)} .idField.bad{border-color:var(--bad)}
+  .idField .pfx{color:var(--muted);font-size:11px;flex:none}
+  .idField input{flex:1;min-width:0;border:0;background:transparent;outline:none;color:var(--ink);
+    padding:5px 0;font:11.5px ui-monospace,Consolas,monospace}
+  .idField .btn{flex:none;border-radius:999px}
+  /* drag-and-drop file zone */
+  .dropZone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:20px 14px;cursor:pointer;
+    border:1.5px dashed var(--line);border-radius:12px;background:var(--paper);text-align:center;transition:border-color .15s,background .15s}
+  .dropZone:hover{border-color:var(--accent)}
+  .dropZone.over{border-color:var(--accent);background:rgba(227,179,65,.08)}
+  .dropZone.has{border-style:solid;border-color:var(--ok)}
+  .dzIcon{font-size:20px;color:var(--accent);line-height:1}
+  .dzMain{font-size:12.5px} .dzMain b{color:var(--accent)}
+  .dzSub{color:var(--muted);font-size:11px;word-break:break-all}
+  /* once something is chosen the picker gets out of the way and this takes over
+     the same space, so the pane doesn't jump when you swap between them */
+  .pickedCard{position:relative;flex:1;display:flex;flex-direction:column;gap:8px;min-height:0;
+    border:1px solid var(--ok);border-radius:12px;padding:10px;background:var(--paper)}
+  /* FIXED height, flex:none: a tall image must scale down inside this box, not
+     stretch it. Without a definite height the image's own size drives the whole
+     column and pushes the review off the screen. */
+  .pcBig{flex:none;height:230px;display:grid;place-items:center;overflow:hidden;border-radius:8px;
+    background:var(--panel-2);color:var(--muted);font-size:12px;letter-spacing:.08em}
+  .pcBig img{max-width:100%;max-height:230px;object-fit:contain;display:block}
+  .pcBig iframe{width:100%;height:100%;border:0;background:#0a0d12;pointer-events:none}
+  .pcFoot{display:flex;gap:10px;align-items:baseline;justify-content:space-between;min-width:0}
+  .pcName{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pcSub{color:var(--muted);font-size:11px;flex:none;text-align:right}
+  .pcX{position:absolute;top:8px;right:8px;z-index:2;width:24px;height:24px;border-radius:50%;padding:0;line-height:1;
+    border:1px solid var(--bad);background:var(--panel);color:var(--bad);font-size:12px;cursor:pointer;
+    display:grid;place-items:center;opacity:.85;transition:opacity .12s,background .12s}
+  .pcX:hover{opacity:1;background:var(--bad);color:#fff}
+  #inscPanel .feeSlideWrap input[type=number]{width:74px;flex:none;text-align:center;font-weight:600;margin:0;padding:7px 4px}
+  #inscDone{font-size:12.5px;line-height:1.7}
+  #inscDone a{word-break:break-all}
   /* 📜 instructions panel: the three prompts, in priority order */
   #promptWrap{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:52}
   #promptWrap.on{display:flex}
@@ -339,10 +453,10 @@
   <span id="crawlInfo" style="color:var(--muted);font-size:12.5px"></span>
   <span style="flex:1"></span>
   <button id="promptBtn" class="btn iconbtn" title="How the AI is instructed — read it, and add your own">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M6.5 2.5h11a2 2 0 0 1 2 2v13.5a3 3 0 0 1-3 3H6a3 3 0 0 0 3-3V4.5a2 2 0 0 0-2-2z"/>
-      <path d="M6.5 2.5A2 2 0 0 0 4.5 4.5v2.2h4.5"/>
-      <path d="M11.5 7h5M11.5 10.5h5M11.5 14h3"/>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 17V5a2 2 0 0 0-2-2H4"/>
+      <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>
+      <path d="M15 8h-5M15 12h-5"/>
     </svg>
   </button>
   <button id="walletBtn" class="btn">Connect wallet</button>
@@ -358,6 +472,98 @@
     <div id="usageStats" class="ustats"></div>
     <p class="dim small">Anthropic's API doesn't let a key query its own balance or total spend, so these totals are tracked locally in this browser. Cost is an estimate at list prices (cache reads bill 0.1× input, cache writes 1.25×).</p>
     <div class="row"><span style="flex:1"></span><button id="resetUsageBtn" class="btn small">Reset totals</button></div>
+  </div>
+</div>
+<div id="inscWrap">
+  <div id="inscPanel">
+    <button id="closeInscBtn" class="winClose" title="Close">✕</button>
+    <h3>Inscribe</h3>
+    <div class="inscRef" id="inscRef"></div>
+    <div id="inscBody">
+      <div class="pblock"><div class="phead"><b>What are you making?</b></div>
+        <div class="inscPick" id="inscRel">
+          <button data-rel="reinscription"><b>↻ Reinscription</b></button>
+          <button data-rel="child"><b>⬇ Child</b></button>
+        </div>
+      </div>
+
+      <div class="inscCols" id="inscCols">
+      <div class="pblock" id="inscPayBlock" hidden><div class="phead"><b>Content</b></div>
+        <div class="inscTabs" id="inscTabs">
+          <button data-pay="text">Text</button><button data-pay="file">File</button><button data-pay="delegate">Delegate</button>
+          <button id="inscMetaBtn" class="metaBtn" title="attach metadata to this inscription">+ metadata</button>
+        </div>
+        <div id="inscPayText" class="inscPane">
+          <textarea id="inscText" spellcheck="false" placeholder="anything — a word, a poem, JSON…"></textarea>
+          <!-- text formats only. HTML and SVG are markup, not text — inscribe
+               those from the File tab, where the type comes from the file. -->
+          <div class="inscRow"><select id="inscMime">
+            <option value="text/plain;charset=utf-8">plain text</option>
+            <option value="application/json">JSON</option>
+            <option value="text/markdown;charset=utf-8">Markdown</option>
+          </select><span style="flex:1"></span><span class="lbl" id="inscTextSize"></span></div>
+        </div>
+        <div id="inscPayFile" class="inscPane" hidden>
+          <label class="dropZone" id="inscDrop">
+            <input type="file" id="inscFile" hidden>
+            <span class="dzIcon">⬆</span>
+            <span class="dzMain">Drop a file here, or <b>choose one</b></span>
+            <span class="dzSub">images, HTML, SVG, anything — under 350 KB</span>
+          </label>
+          <div class="pickedCard" id="inscFilePicked" hidden>
+            <button class="pcX" id="inscFileClear" title="remove this file and choose another">✕</button>
+            <div class="pcBig" id="inscFileThumb"></div>
+            <div class="pcFoot"><span class="pcName" id="inscFileName"></span><span class="pcSub" id="inscFileInfo"></span></div>
+          </div>
+        </div>
+        <div id="inscPayDelegate" class="inscPane" hidden>
+          <div class="idField" id="inscDelegateField"><span class="pfx">id</span><input id="inscDelegate" spellcheck="false" placeholder="64 characters then i0"></div>
+          <div class="pickedCard" id="inscDelegatePicked" hidden>
+            <button class="pcX" id="inscDelegateClear" title="clear and point at something else">✕</button>
+            <div class="pcBig"><iframe id="inscDelegateFrame" sandbox="allow-scripts" referrerpolicy="no-referrer" scrolling="no" title="delegate preview"></iframe></div>
+            <div class="pcFoot"><span class="pcName" id="inscDelegateNum"></span><span class="pcSub" id="inscDelegateSub"></span></div>
+          </div>
+          <div class="lbl" id="inscDelegateMsg">A delegate carries no content of its own: it renders whatever the target shows. You don't need to own the target — this is the way to reference someone else's inscription.</div>
+        </div>
+        <div id="inscMetaBlock" hidden>
+          <textarea id="inscMeta" spellcheck="false" placeholder='a note, or JSON: {"artist":"me","edition":3}'></textarea>
+          <div class="lbl" id="inscMetaHint"></div>
+        </div>
+      </div>
+
+      <div class="inscRight">
+        <div class="pblock" id="inscParentBlock" hidden><div class="phead"><b>Parents</b></div>
+          <div id="inscParents"></div>
+          <div class="inscRow"><button id="inscAddParent" class="btn small">+ add a parent</button></div>
+        </div>
+
+        <div class="pblock" id="inscPostBlock" hidden><div class="phead"><b>Sats on it</b><span style="flex:1"></span>
+            <select id="inscPostage"></select></div>
+          <div class="lbl" id="inscPostNote">How many satoshis the new inscription sits on. 546 is the usual choice.</div>
+        </div>
+
+        <div class="pblock" id="inscFeeBlock" hidden><div class="phead"><b>Network fee</b></div>
+          <div class="feeCards" id="inscFeeRow"></div>
+          <div class="feeSlideWrap">
+            <div class="feeSlide">
+              <input id="inscFeeRange" type="range" min="0" max="100" step="1" aria-label="network fee">
+              <div class="feeTicks" id="inscFeeTicks"></div>
+            </div>
+            <input id="inscFeeCustom" type="number" min="1" max="2000" step="1" aria-label="fee in sat/vB">
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div class="pblock" id="inscReviewBlock" hidden><div class="phead"><b>Review</b></div>
+        <pre id="inscReview" class="phouse"></pre>
+      </div>
+
+      <div id="inscMsg" class="claimMsg"></div>
+      <div class="row"><span class="lbl" id="inscHint">Xverse only for now. Nothing is signed until you press the button.</span>
+        <span style="flex:1"></span><button id="inscGo" class="btn primary" disabled>Inscribe</button></div>
+    </div>
+    <div id="inscDone" hidden></div>
   </div>
 </div>
 <div id="promptWrap">
@@ -504,7 +710,7 @@
     <div id="ordersList"></div>
   </div>
 </div>
-<div id="progress"><span id="progText">…</span><div class="bar"><i></i></div></div>
+<div id="progress"><span id="progText">…</span><div class="cubes" id="progCubes"></div></div>
 <main>
   <section id="chatPane">
     <div id="msgs"><div class="note">Enter a bitmap number and press Explore.<br>The app reads the whole on-chain family via the ordinals.com recursive API, then Claude answers questions about it.</div></div>
@@ -561,6 +767,7 @@ import { marked } from "https://esm.sh/marked@12";
 import DOMPurify from "https://esm.sh/dompurify@3";
 import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
 import { request as walletRequest } from "https://esm.sh/sats-connect@3"; // same wallet-connect flow as btcmail
+import { planInscription } from "./inscribe-plan.js"; // pure, and unit-tested — see test/inscribe.test.mjs
 
 // htmlLabels:false renders labels as plain SVG <text> — HTML-in-foreignObject
 // labels get stripped by sanitization, leaving empty boxes. BOTH the top-level
@@ -594,6 +801,10 @@ const state = {
   balance: { questions: 0, freeLeft: 0, freeAllowance: 1 }, // bought + free-today
   token: null,  // BIP-322 session token — the server trusts ONLY this address
   cfg: null,    // /api/config: { walletGate, gateBitmap, marketUrl, serverHasKey, ... }
+  // both wallet purposes + pubkeys. Inscribing needs the PAYMENT side: a
+  // 546-sat ordinals UTXO cannot fund the fees of its own reveal.
+  pay: null,    // { ordAddress, ordPubkey, payAddress, payPubkey }
+  insc: null,   // the inscribe popup's live state
 };
 
 // ---------------------------------------------------------------------------
@@ -809,6 +1020,7 @@ async function explore() {
   setControls();
   const prog = $("progress");
   prog.className = "on"; $("progText").textContent = "connecting…";
+  startCubes();
 
   try {
     // server-cache first: a cached crawl needs neither the crawl stream nor its
@@ -852,6 +1064,7 @@ async function explore() {
     $("progText").textContent = `✗ ${e.message}`;
   } finally {
     state.crawling = false;
+    stopCubes();   // .done / .err then colour all six at once
     setControls();
   }
 }
@@ -860,6 +1073,38 @@ async function explore() {
 // Chat flow
 // ---------------------------------------------------------------------------
 function setMsgsNote(html) { $("msgs").innerHTML = `<div class="note">${html}</div>`; }
+
+// Loading indicator: six orange cubes. One step every 0.6s, four phases —
+// fill left→right, empty left→right, fill right→left, empty right→left — then
+// round again for as long as the crawl runs.
+const CUBES = 9, CUBE_MS = 600;
+let cubeTimer = null, cubeStep = 0;
+
+function paintCubes() {
+  const box = $("progCubes");
+  if (!box) return;
+  if (box.children.length !== CUBES) {
+    box.innerHTML = Array.from({ length: CUBES }, () => "<i></i>").join("");
+  }
+  const s = cubeStep % (CUBES * 4);
+  const phase = Math.floor(s / CUBES), k = s % CUBES;
+  for (let i = 0; i < CUBES; i++) {
+    const lit =
+      phase === 0 ? i <= k                    // filling from the left
+      : phase === 1 ? i > k                   // emptying from the left
+      : phase === 2 ? i >= CUBES - 1 - k      // filling from the right
+      : i < CUBES - 1 - k;                    // emptying from the right
+    box.children[i].classList.toggle("on", lit);
+  }
+}
+
+function startCubes() {
+  cubeStep = 0;
+  paintCubes();
+  clearInterval(cubeTimer);
+  cubeTimer = setInterval(() => { cubeStep++; paintCubes(); }, CUBE_MS);
+}
+function stopCubes() { clearInterval(cubeTimer); cubeTimer = null; }
 
 // How far the inscribed bitmap index reaches — the server tells us, so the UI
 // follows along when a new index page is published.
@@ -1000,7 +1245,7 @@ function newChat() {
 //   shown as an explorer); rows with >1 parent carry a ⬆N badge listing them,
 //   and a path guard turns any cycle into an inert "already open above" stub
 // - clicking a row previews its /content in the iframe under the tree
-// - rows owned by the signed-in wallet get a green ✓ circle on the right
+// - rows owned by the signed-in wallet get a "+" on the right: inscribe from it
 // ---------------------------------------------------------------------------
 let treeIdx = null;
 let selRow = null;
@@ -1049,9 +1294,10 @@ function makeRow(node, path, opts = {}) {
     <span class="chip">${escapeHtml(node.delegate ? "delegate" : (node.content_type || "?").split(";")[0])}</span>
     <span class="cnt${expandable ? "" : " off"}">${expandable ? [reinIds.length ? `↻${reinIds.length}` : "", childIds.length || "", upIds.length ? `⬆${upIds.length}` : ""].filter(Boolean).join("·") : ""}</span>
     <span class="pbadge${parentIds.length > 1 ? "" : " off"}"${parentIds.length > 1 ? ` title="${parentIds.length} parents:&#10;${escapeHtml(parentIds.map((p) => nodeLabel(treeIdx.byId.get(p))).join("\n"))}"` : ""}>${parentIds.length > 1 ? `⬆${parentIds.length}` : "⬆"}</span>
-    <span class="endpad"></span>
-    <span class="own${ownedByMe(node) ? "" : " off"}" title="your wallet owns this inscription">✓</span>
+    <span class="endpad">${ownedByMe(node) && state.token ? `<button class="rowins" title="yours — inscribe a reinscription or a child from it">+</button>` : ""}</span>
   `;
+  // must stop here: the row's own click selects it and toggles the subtree
+  row.querySelector(".rowins")?.addEventListener("click", (ev) => { ev.stopPropagation(); openInscribe(node); });
   li.appendChild(row);
   let open = false, sub = null;
   const toggle = () => {
@@ -1412,6 +1658,7 @@ async function connectWallet() {
     if (r.status !== "success") throw new Error(r.error?.message || "connection rejected");
     const ord = r.result.addresses.find((a) => a.purpose === "ordinals");
     if (!ord) throw new Error("no ordinals address in wallet");
+    rememberAddresses(r.result.addresses); // inscribing needs the PAYMENT side too
 
     btn.textContent = "sign the message…"; btn.disabled = true;
     const chRes = await apiFetch("/api/auth/challenge", {
@@ -2011,6 +2258,444 @@ $("promptClear").onclick = () => {
   $("promptSaved").textContent = "Cleared.";
 };
 
+// ---------------------------------------------------------------------------
+// Inscribe from the tree: "+" on a row you own -> reinscription or child.
+// The planning and encoding live in inscribe-plan.js / inscribe-tx.js, both
+// covered by the test suite. This part is the popup and the wallet dance.
+// ---------------------------------------------------------------------------
+function rememberAddresses(list) {
+  const ord = list.find((a) => a.purpose === "ordinals");
+  const pay = list.find((a) => a.purpose === "payment");
+  state.pay = {
+    ordAddress: ord?.address || null, ordPubkey: ord?.publicKey || null,
+    payAddress: pay?.address || null, payPubkey: pay?.publicKey || null,
+  };
+}
+
+// Re-ask the wallet if we don't already have both purposes, and refuse to
+// continue if it has since switched to a different account.
+async function ensurePayment() {
+  if (!state.pay?.payAddress || state.pay.ordAddress !== state.wallet?.address) {
+    const r = await walletRequest("wallet_connect", null);
+    if (r.status !== "success") throw new Error(r.error?.message || "wallet connection refused");
+    rememberAddresses(r.result.addresses);
+  }
+  if (state.pay.ordAddress !== state.wallet?.address) {
+    throw new Error(`your wallet is on a different account than the one you signed in with — switch back to ${shortAddr(state.wallet?.address)} in Xverse`);
+  }
+  if (!state.pay.payAddress) throw new Error("this wallet exposed no payment address — a 546-sat inscription cannot pay its own fees");
+  return state.pay;
+}
+
+const ordR = async (path) => {
+  const res = await apiFetch(`/api/ord/r${path}`);
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || `could not read ${path}`);
+  return j;
+};
+
+// Where an inscription sits RIGHT NOW. Never from the crawl — that can be ten
+// minutes old, and a stale satpoint builds a transaction that can never confirm.
+async function inscriptionUtxo(id) {
+  const m = await ordR(`/inscription/${encodeURIComponent(id)}`);
+  const sp = String(m.satpoint || "").split(":");
+  return { id, meta: m, txid: sp[0], vout: Number(sp[1] || 0), offset: Number(sp[2] || 0),
+           value: Number(m.value) || 546, address: m.address || "" };
+}
+
+const shortAddr = (a) => (a ? `${String(a).slice(0, 8)}…${String(a).slice(-4)}` : "?");
+const inscSay =(text, cls = "") => { $("inscMsg").className = `claimMsg ${cls}`; $("inscMsg").textContent = text; };
+
+async function openInscribe(node) {
+  if (!state.token) { alert("Connect your wallet first."); return; }
+  state.insc = {
+    node, anchor: null, relation: null, payload: "text",
+    text: "", file: null, delegate: "", parents: [], metaOn: false, meta: "",
+    feeRate: feeOpts?.medium || 6, postage: 546, plan: null, busy: false,
+  };
+  $("inscDone").hidden = true; $("inscBody").hidden = false;
+  // nodeLabel already reads "#<number>" for anything that isn't a bitmap —
+  // only add the number separately when the label is a district name
+  const refNum = node.bitmap != null && node.number != null ? ` <span class="lbl">#${node.number}</span>` : "";
+  $("inscRef").innerHTML = `
+    <div class="refMain"><b>Inscribing from</b> ${escapeHtml(nodeLabel(node))}${refNum}
+      <div class="id">${escapeHtml(node.id)}</div>
+      <div class="lbl" id="inscRefUtxo">checking where this sat is…</div></div>
+    <iframe class="refPrev" src="https://ordinals.com/content/${encodeURIComponent(node.id)}"
+      sandbox="allow-scripts" referrerpolicy="no-referrer" scrolling="no" loading="lazy" title="what this inscription shows"></iframe>`;
+  for (const b of $("inscRel").querySelectorAll("button")) b.classList.remove("on");
+  $("inscText").value = ""; $("inscDelegate").value = ""; $("inscFile").value = "";
+  $("inscPostage").innerHTML = [330, 546, 1000, 5000, 10000]
+    .map((v) => `<option value="${v}"${v === 546 ? " selected" : ""}>${v} sats</option>`).join("");
+  $("inscDrop").classList.remove("over");
+  $("inscFileThumb").innerHTML = "";
+  $("inscDelegateFrame").removeAttribute("src");
+  showFilePicked(false);
+  showDelegatePicked(false);
+  inscSay("");
+  // same cached rates as the buy panel, without re-rendering the buy panel
+  if (!feeOpts) {
+    try { feeOpts = await (await fetch("/api/fees")).json(); } catch { feeOpts = { fast: 12, medium: 6, slow: 3 }; }
+  }
+  renderInscFees();
+  inscParentRows();
+  renderInsc();
+  $("inscWrap").classList.add("on");
+
+  try {
+    const [u] = await Promise.all([inscriptionUtxo(node.id), ensurePayment().catch((e) => { throw e; })]);
+    state.insc.anchor = u;
+    $("inscRefUtxo").innerHTML = u.address === state.wallet.address
+      ? `<span style="color:var(--ok)">✓ yours</span> · ${u.value} sats · ${u.offset} sats into its output`
+      : `<span style="color:var(--bad)">this sat now sits in ${escapeHtml(short(u.address))} — you cannot inscribe from it</span>`;
+  } catch (e) {
+    $("inscRefUtxo").innerHTML = `<span style="color:var(--bad)">${escapeHtml(e.message || String(e))}</span>`;
+  }
+  renderInsc();
+}
+const closeInscribe = () => { $("inscWrap").classList.remove("on"); };
+
+function inscParentRows() {
+  const s = state.insc, box = $("inscParents");
+  // in child mode the clicked inscription IS the first parent; in reinscription
+  // mode it is only the sat, and any parents are entirely the user's choice
+  const anchorRow = s.relation === "child"
+    ? `<div class="inscP anchor"><span class="num">1</span><span class="who">${escapeHtml(s.node.id)}</span></div>`
+    : "";
+  const from = s.relation === "child" ? 2 : 1;
+  box.innerHTML = anchorRow +
+    s.parents.map((p, i) => {
+      const mine = p.utxo && p.utxo.address === state.wallet.address;
+      const cls = p.utxo ? (mine ? "good" : "bad") : p.error ? "bad" : "";
+      return `<div class="inscP"><span class="num">${i + from}</span>
+        <span class="idField ${cls}" style="flex:1"><span class="pfx">id</span>
+          <input data-pi="${i}" spellcheck="false" placeholder="an inscription you also hold" value="${escapeHtml(p.id || "")}">
+          <button class="btn small danger" data-px="${i}" title="remove">✕</button></span>
+        <span class="tagm ${mine ? "ok" : p.utxo || p.error ? "no" : "lbl"}">${
+          p.checking ? "checking…" : mine ? "✓ yours" : p.utxo ? "not yours" : p.error ? escapeHtml(p.error) : ""}</span></div>`;
+    }).join("");
+  for (const inp of box.querySelectorAll("[data-pi]")) {
+    inp.onchange = async () => {
+      const i = Number(inp.dataset.pi), id = inp.value.trim().toLowerCase();
+      s.parents[i] = { id, checking: true };
+      inscParentRows(); renderInsc();
+      try { s.parents[i] = { id, utxo: await inscriptionUtxo(id) }; }
+      catch (e) { s.parents[i] = { id, error: e.message }; }
+      inscParentRows(); renderInsc();
+    };
+  }
+  for (const b of box.querySelectorAll("[data-px]")) {
+    b.onclick = () => { s.parents.splice(Number(b.dataset.px), 1); inscParentRows(); renderInsc(); };
+  }
+}
+
+// The same fee picker the buy panel uses — tier cards, a log slider and a box —
+// with its own ids and its own state, so nothing in the payment flow is touched.
+let inscFee = null;
+function renderInscFees() {
+  const tiers = [
+    { k: "slow", cls: "eco", label: "Economy", hint: "cheapest — can take hours" },
+    { k: "medium", cls: "norm", label: "Normal", hint: "usually within ~30 minutes" },
+    { k: "fast", cls: "fast", label: "Fast", hint: "aims for the next block" },
+  ];
+  const opts = feeOpts || { fast: 12, medium: 6, slow: 3 };
+  inscFee = inscFee ?? opts.medium;
+  $("inscFeeRow").innerHTML = tiers.map((t) =>
+    `<button class="feeCard ${t.cls}" data-fee="${opts[t.k]}" title="${t.hint}">
+       <span class="ft">${t.label}</span><span class="fv">${opts[t.k]} <small>sat/vB</small></span>
+     </button>`).join("");
+  for (const b of $("inscFeeRow").querySelectorAll("button")) b.onclick = () => setInscFee(Number(b.dataset.fee));
+  $("inscFeeTicks").innerHTML = FEE_TICKS.map((v) => `<span data-fee="${v}" style="left:${feeToPos(v)}%">${v}</span>`).join("");
+  for (const s of $("inscFeeTicks").querySelectorAll("span")) s.onclick = () => setInscFee(Number(s.dataset.fee));
+  $("inscFeeRange").oninput = (e) => setInscFee(posToFee(Number(e.target.value)), { fromSlider: true });
+  $("inscFeeCustom").oninput = (e) => { const v = Number(e.target.value); if (v >= 1) setInscFee(v, { fromBox: true }); };
+  setInscFee(inscFee);
+}
+function setInscFee(v, { fromSlider = false, fromBox = false } = {}) {
+  inscFee = Math.max(1, Math.min(500, Math.round(v)));
+  const pos = feeToPos(inscFee);
+  if (!fromSlider) $("inscFeeRange").value = String(Math.round(pos));
+  if (!fromBox) $("inscFeeCustom").value = String(inscFee);
+  $("inscFeeRange").style.background = `linear-gradient(90deg,var(--accent) ${pos}%,var(--line) ${pos}%)`;
+  for (const b of $("inscFeeRow").querySelectorAll("button")) b.classList.toggle("on", Number(b.dataset.fee) === inscFee);
+  for (const s of $("inscFeeTicks").querySelectorAll("span")) s.classList.toggle("past", Number(s.dataset.fee) <= inscFee);
+  renderInsc();
+}
+
+function renderInsc() {
+  const s = state.insc; if (!s) return;
+  $("inscPayBlock").hidden = !s.relation;
+  $("inscParentBlock").hidden = !s.relation;   // both modes may carry parents
+  $("inscPostBlock").hidden = !s.relation;
+  $("inscFeeBlock").hidden = !s.relation;
+  $("inscReviewBlock").hidden = !s.relation;
+  for (const b of $("inscRel").querySelectorAll("button")) b.classList.toggle("on", b.dataset.rel === s.relation);
+  for (const b of $("inscTabs").querySelectorAll("button")) b.classList.toggle("on", b.dataset.pay === s.payload);
+  $("inscPayText").hidden = s.payload !== "text";
+  $("inscPayFile").hidden = s.payload !== "file";
+  $("inscPayDelegate").hidden = s.payload !== "delegate";
+  // A reinscription cannot pay out LESS than the UTXO it reinscribes, or the
+  // leftover sats (and anything riding on them) go to the miner. So the anchor's
+  // value becomes the floor and the smaller options simply disappear — better
+  // than a dropdown that looks clickable and does nothing.
+  // The list always offers the standard sizes. For a reinscription the anchor's
+  // own value is added and preselected, because that is the only choice that
+  // returns the output whole — anything smaller is allowed but says what it costs.
+  const rein = s.relation === "reinscription" && s.anchor;
+  const dflt = rein ? Math.max(546, s.anchor.value) : 546;
+  if (s.postDefault !== dflt) {
+    s.postDefault = dflt;
+    const opts = [...new Set([330, 546, 1000, 5000, 10000, dflt])].sort((a, b) => a - b);
+    $("inscPostage").innerHTML = opts
+      .map((v) => `<option value="${v}"${v === dflt ? " selected" : ""}>${v.toLocaleString("en-US")} sats</option>`).join("");
+  }
+  const chosen = Number($("inscPostage").value);
+  $("inscPostNote").textContent = rein && chosen < s.anchor.value
+    ? `⚠ this output holds ${s.anchor.value.toLocaleString("en-US")} sats — the other ${(s.anchor.value - chosen).toLocaleString("en-US")} go to the miner, along with anything else inscribed on them. Pick ${s.anchor.value.toLocaleString("en-US")} to keep it whole.`
+    : rein
+      ? `${chosen.toLocaleString("en-US")} sats — returns this output whole, so nothing riding on it can be lost.`
+      : "How many satoshis the new inscription sits on. 546 is the usual choice.";
+  const bytes = s.payload === "text" ? new TextEncoder().encode(s.text).length : s.payload === "file" ? (s.file?.bytes?.length || 0) : 0;
+  $("inscTextSize").textContent = `${bytes.toLocaleString("en-US")} bytes`;
+
+  // metadata (ord tag 5, stored as CBOR). JSON becomes a real structure that
+  // ordinals.com renders as fields; anything else is kept as a text string.
+  $("inscMetaBlock").hidden = !s.metaOn;
+  $("inscMetaBtn").classList.toggle("on", !!s.metaOn);
+  let metaValue;
+  if (s.metaOn && s.meta.trim()) {
+    try {
+      const parsed = JSON.parse(s.meta);
+      metaValue = (parsed && typeof parsed === "object") ? parsed : s.meta.trim();
+      $("inscMetaHint").textContent = metaValue === s.meta.trim()
+        ? "stored as text"
+        : `stored as structured data — ${Object.keys(parsed).length} field${Object.keys(parsed).length === 1 ? "" : "s"}`;
+    } catch {
+      metaValue = s.meta.trim();
+      $("inscMetaHint").textContent = "stored as text (write JSON if you want separate fields)";
+    }
+  } else if (s.metaOn) {
+    $("inscMetaHint").textContent = "Anything here is attached to the inscription itself and shown on ordinals.com — not part of its content.";
+  }
+
+  let plan = null, why = "";
+  try {
+    if (!s.anchor) throw new Error("still checking where this sat is…");
+    plan = planInscription({
+      relation: s.relation, payload: s.payload, anchor: s.anchor, ordAddress: state.wallet.address,
+      extraParents: s.parents.map((p) => p.utxo).filter(Boolean),
+      contentType: s.payload === "file" ? s.file?.type : $("inscMime").value,
+      bodyBytes: bytes, delegate: s.delegate.trim().toLowerCase(),
+      postage: Number($("inscPostage").value), metadata: metaValue,
+    });
+    if (s.parents.some((p) => !p.utxo)) throw new Error("finish checking the extra parents first");
+  } catch (e) { why = e.message; }
+  s.plan = plan;
+
+  const fee = inscFee || 6;
+  $("inscReview").textContent = plan
+    ? [
+        `${plan.relation === "child" ? "child of " + plan.parentIds.length + " parent(s)" : "reinscription on the same sat"} · ${plan.payload}`,
+        plan.tags.delegate ? `delegate  ${plan.tags.delegate}` : `content   ${plan.tags.contentType} · ${bytes} bytes`,
+        ...(plan.tags.metadata !== undefined ? [`metadata  ${JSON.stringify(plan.tags.metadata)}`] : []),
+        ...plan.parentIds.map((p) => `parent    ${p}`),
+        `pointer   ${plan.pointer}`,
+        "",
+        ...plan.ins.map((i, k) => `in  ${k}  ${i.id ? i.id.slice(0, 12) + "…" : ""}  ${i.value} sats  (yours)`),
+        `in  ${plan.ins.length}  funding output`,
+        ...plan.outs.map((o, k) => `out ${k}  → you  ${o.value} sats  ${o.role === "inscription" ? "★ the new inscription" : "returns whole"}`),
+        ...(plan.burned ? ["", `⚠ ${plan.burned.toLocaleString("en-US")} sats of that output are NOT paid back — they go to the miner`] : []),
+        "",
+        `about ${fee} sat/vB — the exact total is shown by your wallet`,
+      ].join("\n")
+    : why;
+  $("inscGo").disabled = !plan || s.busy;
+  $("inscGo").textContent = s.busy ? "working…" : "Inscribe";
+}
+
+async function submitInscribe() {
+  const s = state.insc;
+  if (!s?.plan || s.busy) return;
+  s.busy = true; renderInsc(); inscSay("");
+  const step = (t) => inscSay(t, "busy");
+  try {
+    const pay = await ensurePayment();
+    // re-read the anchor: it may have moved while the popup was open
+    step("Checking the sat is still yours…");
+    const fresh = await inscriptionUtxo(s.node.id);
+    if (fresh.address !== state.wallet.address) throw new Error("that sat has moved out of your wallet");
+    if (fresh.txid !== s.anchor.txid || fresh.vout !== s.anchor.vout) throw new Error("that sat just moved — reopen this window to start again");
+
+    const { buildInscribeTxs } = await import("./inscribe-tx.js");
+    const utxos = (await (await apiFetch(`/api/btc/utxos?address=${encodeURIComponent(pay.payAddress)}`)).json()).utxos || [];
+    const body = s.payload === "text" ? new TextEncoder().encode(s.text) : s.payload === "file" ? s.file.bytes : new Uint8Array(0);
+
+    const out = await buildInscribeTxs({
+      plan: s.plan, body, feeRate: inscFee || 6,
+      pay, ordPubkey: pay.ordPubkey, utxos, onStep: step,
+      signPsbt: async (psbtBytes, signInputs) => {
+        const { u82b64, b642u8 } = await import("./inscribe-tx.js");
+        const r = await walletRequest("signPsbt", { psbt: u82b64(psbtBytes), signInputs, broadcast: false });
+        if (r.status !== "success") throw new Error(r.error?.message || "you cancelled the signature");
+        return b642u8(r.result.psbt);
+      },
+    });
+
+    // both signed — only now does anything reach the network
+    step("Broadcasting the funding transaction…");
+    const cast = async (hex) => {
+      const res = await apiFetch("/api/btc/broadcast", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hex }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "the network refused the transaction");
+      return j.txid;
+    };
+    await cast(out.commitHex);
+    // the reveal MUST land — its input is spendable by nothing else
+    localStorage.setItem(`bac.insc.stuck.${out.commitTxid}`, out.revealHex);
+    step("Broadcasting the inscription…");
+    await cast(out.revealHex);
+    localStorage.removeItem(`bac.insc.stuck.${out.commitTxid}`);
+
+    $("inscBody").hidden = true; $("inscDone").hidden = false;
+    $("inscDone").innerHTML = `
+      <p style="color:var(--ok);font-size:14px;margin:0 0 10px">✓ Inscribed</p>
+      <div class="lbl">new inscription</div><div class="id" style="word-break:break-all">${escapeHtml(out.newInscriptionId)}</div>
+      <div class="row"><a href="https://mempool.space/tx/${out.commitTxid}" target="_blank" rel="noopener">funding tx ↗</a>
+        <a href="https://mempool.space/tx/${out.revealTxid}" target="_blank" rel="noopener">inscription tx ↗</a>
+        <a href="https://ordinals.com/inscription/${encodeURIComponent(out.newInscriptionId)}" target="_blank" rel="noopener">on ordinals.com ↗</a></div>
+      <p class="lbl">It appears in the tree once a block confirms it and ord indexes it — usually within the hour.
+      ${s.plan.parentIds.length > 1 ? "Check its parents on ordinals.com afterwards to confirm all of them attached." : ""}</p>`;
+  } catch (e) {
+    inscSay(e?.message || String(e), "err");
+  } finally {
+    s.busy = false;
+    if (!$("inscDone").hidden) return;
+    renderInsc();
+  }
+}
+
+// Any reveal that was signed but never landed: retry it, or those sats are lost.
+async function inscRetryStuck() {
+  for (const k of Object.keys(localStorage)) {
+    if (!k.startsWith("bac.insc.stuck.")) continue;
+    const hex = localStorage.getItem(k);
+    try {
+      const res = await apiFetch("/api/btc/broadcast", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hex }),
+      });
+      if (res.ok) { localStorage.removeItem(k); console.log("stranded inscription re-broadcast"); }
+    } catch { /* try again next boot */ }
+  }
+}
+
+$("closeInscBtn").onclick = closeInscribe;
+$("inscWrap").addEventListener("click", (e) => { if (e.target === $("inscWrap")) closeInscribe(); });
+for (const b of $("inscRel").querySelectorAll("button")) {
+  b.onclick = () => { state.insc.relation = b.dataset.rel; inscParentRows(); renderInsc(); };
+}
+for (const b of $("inscTabs").querySelectorAll("button")) {
+  b.onclick = () => { state.insc.payload = b.dataset.pay; renderInsc(); };
+}
+$("inscText").addEventListener("input", () => { if (state.insc) { state.insc.text = $("inscText").value; renderInsc(); } });
+$("inscMetaBtn").onclick = () => {
+  if (!state.insc) return;
+  state.insc.metaOn = !state.insc.metaOn;
+  if (!state.insc.metaOn) { state.insc.meta = ""; $("inscMeta").value = ""; }
+  renderInsc();
+  if (state.insc.metaOn) $("inscMeta").focus();
+};
+$("inscMeta").addEventListener("input", () => { if (state.insc) { state.insc.meta = $("inscMeta").value; renderInsc(); } });
+// delegate: as soon as a well-formed id is typed, look it up and show what it
+// actually renders — then collapse to just that, with an ✕ to point elsewhere.
+let delegateT = null;
+function showDelegatePicked(on) {
+  $("inscDelegateField").hidden = on;
+  $("inscDelegatePicked").hidden = !on;
+}
+function clearDelegate() {
+  state.insc.delegate = "";
+  $("inscDelegate").value = "";
+  $("inscDelegateFrame").removeAttribute("src");
+  $("inscDelegateMsg").textContent = "A delegate carries no content of its own: it renders whatever the target shows. You don't need to own the target — this is the way to reference someone else's inscription.";
+  showDelegatePicked(false);
+  renderInsc();
+}
+$("inscDelegateClear").onclick = clearDelegate;
+$("inscDelegate").addEventListener("input", () => {
+  if (!state.insc) return;   // the popup's handlers are global; it may not be open
+  const id = $("inscDelegate").value.trim().toLowerCase();
+  state.insc.delegate = id;
+  renderInsc();
+  clearTimeout(delegateT);
+  if (!/^[0-9a-f]{64}i\d+$/.test(id)) return;
+  $("inscDelegateMsg").textContent = "looking it up…";
+  delegateT = setTimeout(async () => {
+    try {
+      const m = await ordR(`/inscription/${encodeURIComponent(id)}`);
+      $("inscDelegateNum").innerHTML = `#${m.number ?? "?"} <span style="font-family:ui-monospace,Consolas,monospace;color:var(--muted)">${escapeHtml(id.slice(0, 10))}…${escapeHtml(id.slice(-4))}</span>`;
+      $("inscDelegateNum").title = id;
+      $("inscDelegateSub").textContent = `${m.content_type || "?"} · ${Number(m.content_length || 0).toLocaleString("en-US")} bytes`;
+      $("inscDelegateFrame").src = `https://ordinals.com/content/${encodeURIComponent(id)}`;
+      $("inscDelegateMsg").textContent = "The new inscription will render exactly this.";
+      showDelegatePicked(true);
+    } catch (e) {
+      // ord genuinely allows delegating to something not inscribed yet
+      $("inscDelegateMsg").textContent = `${e.message} — you can still inscribe it, but it will render blank until that inscription exists.`;
+    }
+  }, 400);
+});
+$("inscMime").addEventListener("change", renderInsc);
+$("inscPostage").addEventListener("change", renderInsc);
+
+// file: click to choose, or drop one on the zone. Once one is picked the drop
+// area is replaced by a card showing it, with an ✕ to swap it for another.
+async function takeFile(f) {
+  if (!f || !state.insc) return;
+  const bytes = new Uint8Array(await f.arrayBuffer());
+  state.insc.file = { bytes, type: f.type || "application/octet-stream", name: f.name };
+  $("inscFileName").textContent = f.name;
+  $("inscFileInfo").textContent = `${bytes.length.toLocaleString("en-US")} bytes · ${state.insc.file.type}`;
+  const thumb = $("inscFileThumb");
+  if (/^image\//.test(state.insc.file.type)) {
+    // data:, not blob: — the CSP allows data: images and nothing else
+    const fr = new FileReader();
+    fr.onload = () => { thumb.innerHTML = `<img alt="" src="${fr.result}">`; };
+    fr.readAsDataURL(f);
+  } else {
+    thumb.textContent = (f.name.split(".").pop() || "file").slice(0, 5).toUpperCase();
+  }
+  showFilePicked(true);
+  renderInsc();
+}
+function showFilePicked(on) {
+  $("inscDrop").hidden = on;
+  $("inscFilePicked").hidden = !on;
+}
+function clearFile() {
+  state.insc.file = null;
+  $("inscFile").value = "";
+  $("inscFileThumb").innerHTML = "";
+  showFilePicked(false);
+  renderInsc();
+}
+$("inscFileClear").onclick = (e) => { e.preventDefault(); clearFile(); };
+$("inscFile").addEventListener("change", () => takeFile($("inscFile").files?.[0]));
+for (const ev of ["dragenter", "dragover"]) {
+  $("inscDrop").addEventListener(ev, (e) => { e.preventDefault(); $("inscDrop").classList.add("over"); });
+}
+for (const ev of ["dragleave", "drop"]) {
+  $("inscDrop").addEventListener(ev, (e) => { e.preventDefault(); $("inscDrop").classList.remove("over"); });
+}
+$("inscDrop").addEventListener("drop", (e) => takeFile(e.dataTransfer?.files?.[0]));
+// the browser opens a dropped file in the tab otherwise, losing everything typed
+for (const ev of ["dragover", "drop"]) window.addEventListener(ev, (e) => {
+  if ($("inscWrap").classList.contains("on")) e.preventDefault();
+});
+$("inscAddParent").onclick = () => { state.insc.parents.push({ id: "" }); inscParentRows(); renderInsc(); };
+$("inscGo").onclick = submitInscribe;
+
 // boot: load server config (gate/bitmap/marketplace/key status), then restore
 (async () => {
   try { state.cfg = await (await fetch("/api/config")).json(); } catch { state.cfg = null; }
@@ -2023,6 +2708,7 @@ $("promptClear").onclick = () => {
   if (state.token) await apiFetch("/api/auth/session"); // 401 path auto-resets via dropWalletSession
   await loadPromptInfo();                               // which 📜 slots this wallet has earned
   markPromptBtn();
+  if (state.token) inscRetryStuck();                    // a signed reveal that never landed
   setControls();
   updateWalletUi();
   refreshBalance();

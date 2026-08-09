@@ -16,6 +16,7 @@ import {
   verifyScriber, promptRights, NO_PROMPT_RIGHTS,
 } from "./wallet.js";
 import { addClaim, claimIndex, removeClaim } from "./claims.js";
+import { mountInscribe } from "./inscribe.js";
 import { makeChallenge, verifyChallenge, walletAuth } from "./auth.js";
 import {
   PACKS, PAY_ADDRESS, quote, createOrder, attachTx, listOrders, sweepOrders,
@@ -418,6 +419,9 @@ app.get("/api/orders/quote", orderLimiter, async (req, res) => {
     res.status(e.code || 502).json({ error: e.code ? e.message : "could not fetch the BTC price — try again" });
   }
 });
+
+// Chain reads, coin lookup and broadcast for the in-page inscribe tool.
+mountInscribe(app, { requireWallet: needWallet });
 
 // Recommended network fees (guidance; the wallet sets the final fee).
 app.get("/api/fees", orderLimiter, async (req, res) => res.json(await feeRates()));

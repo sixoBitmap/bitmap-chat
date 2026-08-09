@@ -15,5 +15,10 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@noble/curves": "^1.8.1",
+    "@scure/btc-signer": "^1.8.0",
+    "micro-ordinals": "^0.2.2"
   }
 }
