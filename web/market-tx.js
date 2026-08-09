@@ -12,7 +12,7 @@
 // appended. If the wallet quietly signed with SIGHASH_ALL, the offer would be
 // unspendable by anyone and we refuse to store it rather than list a lie.
 
-import { inscLibs, hex2u8, u82b64, b642u8, xonly } from "./inscribe-tx.js";
+import { inscLibs, hex2u8, u82hex, u82b64, b642u8, xonly } from "./inscribe-tx.js";
 
 export const SIGHASH_SINGLE_ANYONECANPAY = 0x83;
 
@@ -66,6 +66,74 @@ export function assertSighash(signedTx) {
       "without it the offer could never be spent, so it has not been saved.");
   }
   return flag;
+}
+
+/**
+ * Complete a purchase around the seller's signed offer.
+ *
+ * The seller's input is carried across WITH its signature intact and placed at
+ * the index the plan demands; the buyer signs only their own inputs. If the
+ * seller's signature were lost or their input moved, the transaction would
+ * simply fail to finalize — it cannot silently pay the wrong party.
+ */
+export async function buildPurchase({ plan, offerPsbt, buyer, signPsbt }) {
+  const { btc } = await inscLibs();
+  const NET = btc.NETWORK;
+
+  const offer = btc.Transaction.fromPSBT(b642u8(offerPsbt), { allowUnknownOutputs: true });
+  const sellerInput = offer.getInput(0);
+  if (!sellerInput?.tapKeySig && !sellerInput?.partialSig?.length) {
+    throw new Error("that offer carries no signature any more — ask the seller to relist it");
+  }
+
+  const tx = new btc.Transaction({ allowUnknownOutputs: true, allowUnknownInputs: true });
+  const scriptFor = (addr) => btc.OutScript.encode(btc.Address(NET).decode(addr));
+
+  plan.ins.forEach((i, idx) => {
+    if (idx === plan.sellerInputIndex) {
+      tx.addInput(sellerInput);                       // signature and all
+      return;
+    }
+    tx.addInput({
+      txid: i.txid, index: i.vout,
+      witnessUtxo: { script: scriptFor(i.owner === "buyer" && i.role !== "padding" ? buyer.payAddress : buyer.ordAddress), amount: BigInt(i.value) },
+      ...(buyer.payPubkey && i.role !== "padding" ? {} : {}),
+      sequence: 0xfffffffd,
+    });
+  });
+  for (const o of plan.outs) tx.addOutputAddress(o.to, BigInt(o.value), NET);
+
+  // the seller's input must still be exactly where the plan put it
+  const check = tx.getInput(plan.sellerInputIndex);
+  if (!check?.tapKeySig && !check?.partialSig?.length) {
+    throw new Error("internal: the seller's signature is not on their input");
+  }
+
+  const signed = btc.Transaction.fromPSBT(
+    await signPsbt(tx.toPSBT(), { [buyer.payAddress]: plan.buyerInputIndexes }),
+    { allowUnknownOutputs: true, allowUnknownInputs: true });
+
+  for (let i = 0; i < signed.inputsLength; i++) {
+    try { signed.finalizeIdx(i); } catch (e) { if (!/final/i.test(String(e.message))) throw e; }
+  }
+  return { hex: u82hex(signed.extract()), txid: signed.id };
+}
+
+/** The padding a buyer needs before their first purchase. */
+export async function buildDummies({ plan, payAddress, signPsbt }) {
+  const { btc } = await inscLibs();
+  const NET = btc.NETWORK;
+  const tx = new btc.Transaction();
+  const script = btc.OutScript.encode(btc.Address(NET).decode(payAddress));
+  for (const i of plan.ins) {
+    tx.addInput({ txid: i.txid, index: i.vout, witnessUtxo: { script, amount: BigInt(i.value) }, sequence: 0xfffffffd });
+  }
+  for (const o of plan.outs) tx.addOutputAddress(o.to, BigInt(o.value), NET);
+  const signed = btc.Transaction.fromPSBT(await signPsbt(tx.toPSBT(), { [payAddress]: plan.ins.map((_, i) => i) }));
+  for (let i = 0; i < signed.inputsLength; i++) {
+    try { signed.finalizeIdx(i); } catch (e) { if (!/final/i.test(String(e.message))) throw e; }
+  }
+  return { hex: u82hex(signed.extract()), txid: signed.id };
 }
 
 export { u82b64, b642u8, hex2u8 };

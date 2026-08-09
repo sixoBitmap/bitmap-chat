@@ -2512,9 +2512,7 @@ async function loadMarket() {
         } catch (e) { mktSay(e.message, "err"); }
       };
     }
-    for (const b of $("mktList").querySelectorAll("[data-buy]")) {
-      b.onclick = () => mktSay("Buying lands next — the seller's offer is stored and ready for it.", "");
-    }
+    for (const b of $("mktList").querySelectorAll("[data-buy]")) b.onclick = () => buyParcel(b.dataset.buy);
 
     // you can only sell parcels you hold and haven't already listed
     const listed = new Set(live.map((l) => l.inscriptionId));
@@ -2523,6 +2521,81 @@ async function loadMarket() {
     $("mktNote").hidden = !sellable.length;
     $("mktWhich").innerHTML = sellable.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.text || p.id.slice(0, 10))}</option>`).join("");
   } catch (e) { $("mktList").innerHTML = `<div class="lbl">${escapeHtml(e.message || "market unavailable")}</div>`; }
+}
+
+// Buying: take the seller's stored offer, build the only transaction shape its
+// signature allows, sign our own inputs, broadcast. Padding outputs come first
+// if this wallet has never bought before.
+async function buyParcel(id) {
+  const btn = $("mktList").querySelector(`[data-buy="${CSS.escape(id)}"]`);
+  if (btn) btn.disabled = true;
+  try {
+    mktSay("checking the offer…");
+    const pay = await ensurePayment();
+    const oRes = await apiFetch(`/api/market/${id}/offer`);
+    const offer = await oRes.json();
+    if (!oRes.ok) throw new Error(offer.error || "that offer is gone");
+
+    const coins = (await (await apiFetch(`/api/btc/utxos?address=${encodeURIComponent(pay.payAddress)}`)).json()).utxos || [];
+    const spendable = coins.filter((c) => c.confirmed);
+    const { planPurchase, planDummies, MIN_DUMMY, MAX_DUMMY } = await import("./market-plan.js");
+    const mkt = await import("./market-tx.js");
+    const { u82b64, b642u8 } = await import("./inscribe-tx.js");
+    const sign = async (bytes, signInputs) => {
+      const r = await walletRequest("signPsbt", { psbt: u82b64(bytes), signInputs, broadcast: false });
+      if (r.status !== "success") throw new Error(r.error?.message || "you cancelled the signature");
+      return b642u8(r.result.psbt);
+    };
+    const cast = async (hex) => {
+      const res = await apiFetch("/api/btc/broadcast", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hex }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "the network refused the transaction");
+      return j.txid;
+    };
+
+    // two small coins hold the indexes still; make them if this wallet has none
+    let padding = spendable.filter((c) => c.value >= MIN_DUMMY && c.value <= MAX_DUMMY).slice(0, 2);
+    if (padding.length < 2) {
+      if (!confirm("Buying needs two small padding outputs, which this wallet doesn't have yet.\n\nMake them now? That is one small transaction, and they are reused for every future purchase.")) {
+        throw new Error("cancelled");
+      }
+      mktSay("preparing padding — approve in your wallet…");
+      const dPlan = planDummies({ payAddress: pay.payAddress, funding: spendable, feeRate: 6 });
+      const built = await mkt.buildDummies({ plan: dPlan, payAddress: pay.payAddress, signPsbt: sign });
+      await cast(built.hex);
+      mktSay("padding created — it needs one confirmation, then buy again.", "ok");
+      return;
+    }
+
+    const plan = planPurchase({
+      listing: { utxo: offer.utxo, priceSats: offer.priceSats, sellerScriptAddress: offer.seller },
+      buyer: { ordAddress: state.wallet.address, payAddress: pay.payAddress },
+      dummies: padding,
+      funding: spendable.filter((c) => !padding.some((p) => p.txid === c.txid && p.vout === c.vout)),
+      feeRate: 6,
+    });
+    if (!confirm(`Buy ${offer.inscriptionId.slice(0, 10)}… for ${fmtS(plan.price)}?\n\nTotal with the network fee: about ${fmtS(plan.total)}.`)) throw new Error("cancelled");
+
+    mktSay("sign the purchase in your wallet…");
+    const done = await mkt.buildPurchase({
+      plan, offerPsbt: offer.psbt,
+      buyer: { ordAddress: state.wallet.address, payAddress: pay.payAddress, payPubkey: pay.payPubkey },
+      signPsbt: sign,
+    });
+    mktSay("broadcasting…");
+    const txid = await cast(done.hex);
+    await apiFetch(`/api/market/${id}/sold`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ txid }),
+    }).catch(() => {});
+    mktSay(`bought — ${txid.slice(0, 12)}… The parcel is yours once it confirms.`, "ok");
+    loadMarket();
+    scanWalletAddr(true).catch(() => {});
+  } catch (e) {
+    if (!/^cancelled$/i.test(e?.message || "")) mktSay(e?.message || String(e), "err");
+    else mktSay("");
+  } finally { if (btn) btn.disabled = false; }
 }
 
 $("mktListBtn").onclick = async () => {
