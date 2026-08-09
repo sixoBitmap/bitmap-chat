@@ -72,6 +72,10 @@
   /* family explorer (file-tree) pane */
   #graphPane{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column}
   #graphHead{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);font-size:13px;color:var(--muted)}
+  #graphHead .lbl{color:var(--muted);font-size:11.5px}
+  #graphHead select{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:7px;
+    padding:3px 6px;font-size:11.5px;cursor:pointer}
+  #graphHead select:hover{border-color:var(--accent)}
   #treeWrap{flex:1;min-height:0;overflow:auto;padding:8px 10px}
   .ftree,.ftree ul{list-style:none;margin:0;padding:0}
   .ftree ul{padding-left:16px;margin-left:9px;border-left:1px solid var(--line)}
@@ -732,7 +736,15 @@
     </div>
   </section>
   <section id="graphPane">
-    <div id="graphHead"><span id="graphTitle">Family explorer</span><span style="flex:1"></span></div>
+    <div id="graphHead"><span id="graphTitle">Family explorer</span><span style="flex:1"></span>
+      <label class="lbl" for="treeSort">sort</label>
+      <select id="treeSort" title="how the children and reinscriptions under each row are ordered">
+        <option value="default">default</option>
+        <option value="newest">newest first</option>
+        <option value="oldest">oldest first</option>
+        <option value="children">most children</option>
+        <option value="reins">most reinscriptions</option>
+      </select></div>
     <div id="treeWrap"><ul id="fileTree" class="ftree"></ul></div>
     <div id="splitBar" title="drag to resize the tree / content viewer"></div>
     <div id="previewBar">
@@ -1249,6 +1261,7 @@ function newChat() {
 // ---------------------------------------------------------------------------
 let treeIdx = null;
 let selRow = null;
+let treeSort = localStorage.getItem("bac_treesort") || "default";
 const pushTo = (m, k, v) => { const l = m.get(k); if (l) l.push(v); else m.set(k, [v]); };
 
 function buildTreeIndex() {
@@ -1262,7 +1275,20 @@ function buildTreeIndex() {
     if (e.type === "child" || e.type === "ancestor") { pushTo(kids, e.from, e.to); pushTo(parentsOf, e.to, e.from); }
     else if (e.type === "reinscription") pushTo(reins, e.from, e.to);
   }
-  const cmp = (a, b) => (byId.get(a).number ?? Infinity) - (byId.get(b).number ?? Infinity) || a.localeCompare(b);
+  // How the rows under each node are ordered. "default" is inscription order,
+  // which is also the tie-breaker for every other mode so the tree never
+  // reshuffles between renders.
+  const byNumber = (a, b) => (byId.get(a).number ?? Infinity) - (byId.get(b).number ?? Infinity) || a.localeCompare(b);
+  const at = (id) => byId.get(id)?.timestamp ?? 0;
+  const countKids = (id) => (kids.get(id) || []).length;
+  const countReins = (id) => (reins.get(id) || []).length;
+  const cmp = {
+    default: byNumber,
+    newest: (a, b) => at(b) - at(a) || byNumber(a, b),
+    oldest: (a, b) => at(a) - at(b) || byNumber(a, b),
+    children: (a, b) => countKids(b) - countKids(a) || byNumber(a, b),
+    reins: (a, b) => countReins(b) - countReins(a) || byNumber(a, b),
+  }[treeSort] || byNumber;
   for (const l of kids.values()) l.sort(cmp);
   for (const l of reins.values()) l.sort(cmp);
   return { byId, kids, parentsOf, reins };
@@ -2236,6 +2262,14 @@ $("chatInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
 });
 $("bmInput").addEventListener("keydown", (e) => { if (e.key === "Enter") explore(); });
+
+// tree ordering — remembered, and re-applied on the next crawl too
+$("treeSort").value = treeSort;
+$("treeSort").onchange = () => {
+  treeSort = $("treeSort").value;
+  localStorage.setItem("bac_treesort", treeSort);
+  if (state.graph) renderTree();
+};
 
 // 📜 instructions panel
 $("promptBtn").onclick = openPrompts;
