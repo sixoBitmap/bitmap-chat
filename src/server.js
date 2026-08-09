@@ -18,6 +18,7 @@ import {
 import { addClaim, claimIndex, removeClaim } from "./claims.js";
 import { mountInscribe } from "./inscribe.js";
 import { addBug, listBugs, deleteBug, bugStats, BUG_MAX } from "./bugs.js";
+import { blockArt } from "./blockart.js";
 import { makeChallenge, verifyChallenge, walletAuth } from "./auth.js";
 import {
   PACKS, PAY_ADDRESS, quote, createOrder, attachTx, listOrders, sweepOrders,
@@ -418,6 +419,19 @@ app.get("/api/orders/quote", orderLimiter, async (req, res) => {
     res.json(q); // the code itself stays server-side
   } catch (e) {
     res.status(e.code || 502).json({ error: e.code ? e.message : "could not fetch the BTC price — try again" });
+  }
+});
+
+// A district drawn as its block's transactions. Computed once per block and
+// cached forever (blocks don't change), so this is cheap after the first hit.
+const artLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 400, standardHeaders: true, legacyHeaders: false });
+app.get("/api/block/:height/art", artLimiter, async (req, res) => {
+  try {
+    const art = await blockArt(req.params.height);
+    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    res.json(art);
+  } catch (e) {
+    res.status(e.code || 502).json({ error: e.code ? e.message : "could not read that block right now" });
   }
 });
 

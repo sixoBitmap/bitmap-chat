@@ -38,6 +38,9 @@ services:
         value: /data/claims.json         # manually claimed PathScribers
       - key: BUGS_FILE
         value: /data/bugs.json           # bug reports, read from the admin panel
+      - key: BLOCKART_FILE
+        value: /data/blockart.json       # district mosaics — blocks never change,
+                                         # so this cache is worth keeping forever
       - key: PROMPT_FILE
         value: /data/system-prompt.txt   # the admin panel's live prompt
 

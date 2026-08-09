@@ -7,3 +7,4 @@ node_modules/
 .system-prompt.txt
 .claims.json
 .bugs.json
+.blockart.json

@@ -458,8 +458,7 @@
   .bmCard{display:flex;gap:10px;align-items:center;width:100%;text-align:left;cursor:pointer;
     border:1px solid var(--line);border-radius:0;background:var(--panel-2);color:var(--ink);padding:5px 8px 5px 5px}
   .bmCard:hover{border-color:var(--accent);background:var(--paper)}
-  .bmArt{flex:none;width:38px;height:38px;overflow:hidden;background:#0a0d12;border:1px solid var(--line);display:block}
-  .bmArt iframe{width:152px;height:152px;border:0;transform:scale(.25);transform-origin:top left;pointer-events:none}
+  .bmArt{flex:none;width:38px;height:38px;background:#0a0d12;border:1px solid var(--line);display:block}
   .bmName{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .bmGo{flex:none;color:var(--muted);display:grid;place-items:center}
   .bmGo svg{width:15px;height:15px;display:block}
@@ -1896,9 +1895,7 @@ function openPicker() {
   $("pickerBitmaps").innerHTML = bitmaps.length
     ? bitmaps.map((b) => `
         <button class="bmCard" data-bm="${Number(b.n)}" title="explore ${Number(b.n)}.bitmap">
-          <span class="bmArt">${b.previewId
-            ? `<iframe src="https://ordinals.com/content/${encodeURIComponent(b.previewId)}" sandbox="allow-scripts" loading="lazy" referrerpolicy="no-referrer" scrolling="no"></iframe>`
-            : ""}</span>
+          <canvas class="bmArt" width="76" height="76" data-block="${Number(b.n)}" title="${Number(b.n)}.bitmap — its block's transactions"></canvas>
           <span class="bmName">${Number(b.n)}.bitmap</span>
           <span class="bmGo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="7"/><path d="m20 20-4.35-4.35"/></svg></span>
@@ -1907,6 +1904,7 @@ function openPicker() {
   for (const btn of $("pickerBitmaps").querySelectorAll("button[data-bm]")) {
     btn.onclick = () => chooseBitmap(Number(btn.dataset.bm));
   }
+  paintDistrictArt($("pickerBitmaps"));
 
   // MIDDLE — parcels only ("x.114588.bitmap" canonical children)
   const inscChip = (p, label) => `<button class="btn small" data-insc="${escapeHtml(p.id)}" title="${escapeHtml(p.id)}">${escapeHtml(label)}</button>`;
@@ -2453,6 +2451,70 @@ $("promptClear").onclick = () => {
   countPrompts(); markPromptBtn();
   $("promptSaved").textContent = "Cleared.";
 };
+
+// ---------------------------------------------------------------------------
+// District art: a bitmap's block drawn as a mosaic of its transactions, each
+// square sized by that transaction's total output. The layout is mononaut's
+// Mondrian packing (bitfeed), computed server-side and cached per block.
+//
+// Only rows you can actually see are drawn: the first view of a block costs
+// the server a whole raw block, so nothing is fetched speculatively.
+// ---------------------------------------------------------------------------
+const artCache = new Map();      // block height -> art, or null once it failed
+let artQueue = [], artBusy = 0;
+const ART_PARALLEL = 2;
+
+async function fetchArt(n) {
+  if (artCache.has(n)) return artCache.get(n);
+  try {
+    const res = await fetch(`/api/block/${n}/art`);
+    const art = res.ok ? await res.json() : null;
+    artCache.set(n, art);
+    return art;
+  } catch { artCache.set(n, null); return null; }
+}
+
+function drawArt(canvas, art) {
+  if (!art?.slots?.length) return;
+  const ctx = canvas.getContext("2d");
+  const side = Math.max(art.w, art.h) || 1;
+  const k = canvas.width / side;                      // fit the long edge
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#e3b341";
+  for (let i = 0; i < art.slots.length; i += 3) {
+    const x = art.slots[i] * k, y = art.slots[i + 1] * k, s = art.slots[i + 2] * k;
+    // a hairline gap keeps neighbouring transactions readable when tiny
+    ctx.fillRect(x, y, Math.max(s - k * 0.18, 0.7), Math.max(s - k * 0.18, 0.7));
+  }
+  canvas.dataset.drawn = "1";
+}
+
+function pumpArtQueue() {
+  while (artBusy < ART_PARALLEL && artQueue.length) {
+    const canvas = artQueue.shift();
+    if (!canvas.isConnected || canvas.dataset.drawn) continue;
+    artBusy++;
+    fetchArt(Number(canvas.dataset.block))
+      .then((art) => { if (canvas.isConnected) drawArt(canvas, art); })
+      .finally(() => { artBusy--; pumpArtQueue(); });
+  }
+}
+
+const artSeen = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting || e.target.dataset.drawn) continue;
+    artSeen.unobserve(e.target);
+    artQueue.push(e.target);
+  }
+  pumpArtQueue();
+}, { rootMargin: "120px" });
+
+function paintDistrictArt(root) {
+  for (const c of root.querySelectorAll("canvas.bmArt")) {
+    const cached = artCache.get(Number(c.dataset.block));
+    if (cached) drawArt(c, cached); else artSeen.observe(c);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Inscribe from the tree: "+" on a row you own -> reinscription or child.
