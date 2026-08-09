@@ -22,6 +22,11 @@
   .btn.primary{background:var(--accent);border-color:var(--accent);color:#151515;font-weight:600}
   .btn.danger{border-color:var(--bad);color:var(--bad)}
   .btn.small{padding:3px 8px;font-size:11.5px}
+  /* destructive row action: an icon, not a button — "delete" was wrapping */
+  .iconDel{background:none;border:0;padding:4px;margin:0;cursor:pointer;color:var(--muted);
+    display:inline-grid;place-items:center;opacity:.65;transition:color .12s,opacity .12s}
+  .iconDel:hover{color:var(--bad);opacity:1}
+  .iconDel svg{width:15px;height:15px;display:block}
   a{color:var(--neighbor)}
   input,select{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 10px;font-size:13px}
   /* login */
@@ -47,6 +52,8 @@
   .box h3{margin:0 0 10px;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.05em}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th.sortable{cursor:pointer;user-select:none}
+  th.sortable:hover{color:var(--accent)}
   td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:middle;word-break:break-word}
   .mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
   .pill{font-size:10.5px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
@@ -275,20 +282,51 @@ async function loadAll(refresh = false) {
   loadBugs();
 }
 
+// Reports are kept client-side so sorting doesn't re-fetch. Newest first by
+// default; clicking a header sorts by it, clicking again flips the direction.
+let bugsData = [];
+let bugSort = { key: "at", dir: "desc" };
+
 async function loadBugs() {
   try {
     const d = await api("/api/admin/bugs");
+    bugsData = d.bugs;
     $("bugCards").innerHTML = [["reports", d.stats.total], ["people", d.stats.reporters]]
       .map(([l, v]) => `<div class="card"><span class="big">${v}</span><span class="lbl">${l}</span></div>`).join("");
+    renderBugs();
+  } catch (e) { $("bugTable").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+}
+
+function renderBugs() {
+  try {
+    const { key, dir } = bugSort, sign = dir === "asc" ? 1 : -1;
+    const rows = [...bugsData].sort((a, b) =>
+      (key === "address" ? String(a.address).localeCompare(String(b.address)) : a.at - b.at) * sign || b.at - a.at);
+    const arrow = (k) => (key === k ? (dir === "asc" ? " ▲" : " ▼") : "");
     $("bugTable").className = "";
-    $("bugTable").innerHTML = d.bugs.length ? `<table>
-      <thead><tr><th>when</th><th>from</th><th>report</th><th></th></tr></thead>
-      <tbody>${d.bugs.map((b) => `<tr>
+    $("bugTable").innerHTML = rows.length ? `<table>
+      <thead><tr>
+        <th class="sortable" data-sort="at">when${arrow("at")}</th>
+        <th class="sortable" data-sort="address">from${arrow("address")}</th>
+        <th>report</th><th></th></tr></thead>
+      <tbody>${rows.map((b) => `<tr>
         <td style="white-space:nowrap">${when(b.at)}</td>
         <td class="owner">${esc(b.address)}</td>
         <td style="white-space:pre-wrap">${esc(b.text)}</td>
-        <td style="text-align:right"><button class="btn small danger" data-bug="${esc(b.id)}">delete</button></td>
+        <td style="text-align:right;white-space:nowrap"><button class="iconDel" data-bug="${esc(b.id)}" title="delete this report">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <path d="M10 11v6M14 11v6"/>
+          </svg></button></td>
       </tr>`).join("")}</tbody></table>` : `<div class="empty">no reports yet</div>`;
+    for (const th of $("bugTable").querySelectorAll("[data-sort]")) {
+      th.onclick = () => {
+        const k = th.dataset.sort;
+        // same column flips the direction; a new one starts newest / A-Z
+        bugSort = { key: k, dir: bugSort.key === k ? (bugSort.dir === "asc" ? "desc" : "asc") : (k === "at" ? "desc" : "asc") };
+        renderBugs();
+      };
+    }
     for (const btn of $("bugTable").querySelectorAll("[data-bug]")) {
       btn.onclick = async () => {
         if (!confirm("Delete this report? It cannot be brought back.")) return;
