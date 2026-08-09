@@ -41,6 +41,8 @@ services:
       - key: BLOCKART_FILE
         value: /data/blockart.json       # district mosaics — blocks never change,
                                          # so this cache is worth keeping forever
+      - key: MARKET_FILE
+        value: /data/market.json         # parcel listings (signed offers, no coins)
       - key: PROMPT_FILE
         value: /data/system-prompt.txt   # the admin panel's live prompt
 

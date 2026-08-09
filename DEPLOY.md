@@ -53,6 +53,7 @@ Everything else is default. `PORT` is injected by Render and the server reads it
 | `CLAIMS_FILE` | `/data/claims.json` | manually claimed PathScribers |
 | `BUGS_FILE` | `/data/bugs.json` | bug reports shown in the admin panel |
 | `BLOCKART_FILE` | `/data/blockart.json` | district mosaics; a block is fetched and laid out once, then cached forever |
+| `MARKET_FILE` | `/data/market.json` | parcel listings — signed offers only, never coins or keys |
 | `PROMPT_FILE` | `/data/system-prompt.txt` | the prompt saved from the admin panel |
 
 **The five file paths are not optional.** Render's container filesystem is

@@ -8,3 +8,4 @@ node_modules/
 .claims.json
 .bugs.json
 .blockart.json
+.market.json

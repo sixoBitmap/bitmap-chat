@@ -19,6 +19,7 @@ import { addClaim, claimIndex, removeClaim } from "./claims.js";
 import { mountInscribe } from "./inscribe.js";
 import { addBug, listBugs, deleteBug, bugStats, BUG_MAX } from "./bugs.js";
 import { blockArt } from "./blockart.js";
+import { listParcel, liveListings, offerFor, delist, markSold, marketStats, allListings } from "./market.js";
 import { makeChallenge, verifyChallenge, walletAuth } from "./auth.js";
 import {
   PACKS, PAY_ADDRESS, quote, createOrder, attachTx, listOrders, sweepOrders,
@@ -433,6 +434,49 @@ app.get("/api/block/:height/art", artLimiter, async (req, res) => {
   } catch (e) {
     res.status(e.code || 502).json({ error: e.code ? e.message : "could not read that block right now" });
   }
+});
+
+// --- parcel marketplace ------------------------------------------------------
+// Non-custodial: a listing is the seller's own signed offer. Nothing of value
+// is held here, and every read re-checks the chain before calling one live.
+const marketLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+
+app.get("/api/market", marketLimiter, async (req, res) => {
+  try { res.json({ listings: await liveListings(), stats: marketStats(), gateBitmap: GATE_BITMAP }); }
+  catch (e) { res.status(502).json({ error: e?.message || "could not read the market" }); }
+});
+
+app.post("/api/market/list", marketLimiter, async (req, res) => {
+  if (needWallet(req, res)) return;
+  try {
+    res.json(await listParcel({
+      seller: req.walletAddr,
+      inscriptionId: String(req.body?.inscriptionId || "").trim().toLowerCase(),
+      priceSats: req.body?.priceSats,
+      psbt: req.body?.psbt,
+    }));
+  } catch (e) { res.status(e.code || 500).json({ error: e.message || "could not list that" }); }
+});
+
+// The seller's signed offer, handed over only to complete a purchase.
+app.get("/api/market/:id/offer", marketLimiter, (req, res) => {
+  if (needWallet(req, res)) return;
+  try { const l = offerFor(req.params.id); res.json({ id: l.id, psbt: l.psbt, priceSats: l.priceSats, seller: l.seller, inscriptionId: l.inscriptionId, utxo: l.utxo }); }
+  catch (e) { res.status(e.code || 500).json({ error: e.message }); }
+});
+
+app.post("/api/market/:id/sold", marketLimiter, (req, res) => {
+  if (needWallet(req, res)) return;
+  try { res.json(markSold(req.params.id, String(req.body?.txid || "").trim().toLowerCase())); }
+  catch (e) { res.status(e.code || 500).json({ error: e.message }); }
+});
+
+app.delete("/api/market/:id", marketLimiter, async (req, res) => {
+  if (needWallet(req, res)) return;
+  try {
+    delist(req.params.id, req.walletAddr, { isAdmin: await isAdmin(req.walletAddr).catch(() => false) });
+    res.json({ ok: true });
+  } catch (e) { res.status(e.code || 500).json({ error: e.message }); }
 });
 
 // Report a bug. The reporter sends only text — the address comes from their
