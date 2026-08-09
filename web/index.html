@@ -463,6 +463,20 @@
   .bmGo{flex:none;color:var(--muted);display:grid;place-items:center}
   .bmGo svg{width:15px;height:15px;display:block}
   .bmCard:hover .bmGo{color:var(--accent)}
+  /* parcel market */
+  .mktList{display:flex;flex-direction:column;gap:4px;max-height:150px;overflow-y:auto}
+  .mktRow{display:flex;gap:8px;align-items:center;font-size:12px;border:1px solid var(--line);
+    border-radius:7px;padding:4px 8px;background:var(--panel-2)}
+  .mktRow .p{flex:1;min-width:0;font-family:ui-monospace,Consolas,monospace;overflow:hidden;text-overflow:ellipsis}
+  .mktRow .price{color:var(--accent);white-space:nowrap;font-weight:600}
+  .mktRow.mine{border-color:rgba(227,179,65,.5)}
+  .mktRow .btn{padding:2px 8px;font-size:11px}
+  .mktSell{display:flex;gap:6px;align-items:center;margin-top:8px}
+  .mktSell select,.mktSell input{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    border-radius:7px;padding:5px 8px;font-size:12px;min-width:0}
+  .mktSell select{flex:1} .mktSell input{width:110px}
+  #mktMsg{margin-top:6px;line-height:1.4}
+  #mktMsg.ok{color:var(--ok)} #mktMsg.err{color:var(--bad)}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chips .none{color:var(--muted);font-size:12.5px}
   .chips button{font-family:ui-monospace,Consolas,monospace}
@@ -673,6 +687,14 @@
           <div class="gcol">
             <h4 id="pickerParcelsTitle">Your parcels</h4>
             <div class="chips" id="pickerParcels"></div>
+            <h4 style="margin-top:12px">Parcel market <span class="lbl" id="mktStats"></span></h4>
+            <div id="mktList" class="mktList">loading…</div>
+            <div class="mktSell" id="mktSell" hidden>
+              <select id="mktWhich"></select>
+              <input id="mktPrice" type="number" min="1000" step="1000" placeholder="price in sats">
+              <button id="mktListBtn" class="btn small primary">List</button>
+            </div>
+            <div class="lbl" id="mktMsg"></div>
           </div>
           <div class="gcol">
             <h4>Your PathScribers</h4>
@@ -1905,6 +1927,7 @@ function openPicker() {
     btn.onclick = () => chooseBitmap(Number(btn.dataset.bm));
   }
   paintDistrictArt($("pickerBitmaps"));
+  loadMarket();
 
   // MIDDLE — parcels only ("x.114588.bitmap" canonical children)
   const inscChip = (p, label) => `<button class="btn small" data-insc="${escapeHtml(p.id)}" title="${escapeHtml(p.id)}">${escapeHtml(label)}</button>`;
@@ -2450,6 +2473,92 @@ $("promptClear").onclick = () => {
   $("promptMain").value = housePromptText || "";
   countPrompts(); markPromptBtn();
   $("promptSaved").textContent = "Cleared.";
+};
+
+// ---------------------------------------------------------------------------
+// Parcel market. Nothing is held anywhere: a listing is the seller's own signed
+// offer, and the server only remembers it. Selling is one signature; the offer
+// stays yours to withdraw until someone spends it.
+// ---------------------------------------------------------------------------
+const mktSay = (t, cls = "") => { $("mktMsg").className = cls; $("mktMsg").textContent = t; };
+const fmtS = (n) => `${Number(n).toLocaleString("en-US")} sats`;
+
+async function loadMarket() {
+  try {
+    const d = await (await fetch("/api/market")).json();
+    const mine = state.wallet?.address;
+    $("mktStats").textContent = d.stats.live
+      ? `${d.stats.live} for sale · floor ${fmtS(d.stats.floor)}`
+      : "nothing listed yet";
+    const live = d.listings.filter((l) => l.status === "live");
+    $("mktList").innerHTML = live.length ? live.map((l) => `
+      <div class="mktRow${l.seller === mine ? " mine" : ""}">
+        <span class="p">${escapeHtml(l.parcel)}</span>
+        <span class="price">${fmtS(l.priceSats)}</span>
+        ${l.seller === mine
+          ? `<button class="btn small danger" data-unlist="${escapeHtml(l.id)}">withdraw</button>`
+          : `<button class="btn small" data-buy="${escapeHtml(l.id)}">Buy</button>`}
+      </div>`).join("") : `<div class="lbl">no parcels listed</div>`;
+
+    for (const b of $("mktList").querySelectorAll("[data-unlist]")) {
+      b.onclick = async () => {
+        if (!confirm("Withdraw this listing?")) return;
+        try {
+          const r = await apiFetch(`/api/market/${b.dataset.unlist}`, { method: "DELETE" });
+          if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "could not withdraw it");
+          mktSay("withdrawn", "ok"); loadMarket();
+        } catch (e) { mktSay(e.message, "err"); }
+      };
+    }
+    for (const b of $("mktList").querySelectorAll("[data-buy]")) {
+      b.onclick = () => mktSay("Buying lands next — the seller's offer is stored and ready for it.", "");
+    }
+
+    // you can only sell parcels you hold and haven't already listed
+    const listed = new Set(live.map((l) => l.inscriptionId));
+    const sellable = (state.wallet?.parcels || []).filter((p) => !listed.has(p.id));
+    $("mktSell").hidden = !sellable.length;
+    $("mktWhich").innerHTML = sellable.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.text || p.id.slice(0, 10))}</option>`).join("");
+  } catch (e) { $("mktList").innerHTML = `<div class="lbl">${escapeHtml(e.message || "market unavailable")}</div>`; }
+}
+
+$("mktListBtn").onclick = async () => {
+  const inscriptionId = $("mktWhich").value;
+  const priceSats = Math.round(Number($("mktPrice").value));
+  if (!inscriptionId) return;
+  if (!(priceSats >= 1000)) return mktSay("pick a price of at least 1000 sats", "err");
+  $("mktListBtn").disabled = true;
+  try {
+    mktSay("checking the parcel…");
+    const pay = await ensurePayment();
+    const utxo = await inscriptionUtxo(inscriptionId);
+    if (utxo.address !== state.wallet.address) throw new Error("that parcel is not in this wallet any more");
+
+    const { buildListing } = await import("./market-tx.js");
+    const { u82b64, b642u8 } = await import("./inscribe-tx.js");
+    mktSay("sign the offer in your wallet…");
+    const offer = await buildListing({
+      utxo, ordAddress: state.wallet.address, ordPubkey: pay.ordPubkey,
+      priceSats, payTo: pay.payAddress || state.wallet.address,
+      signPsbt: async (bytes, signInputs) => {
+        const r = await walletRequest("signPsbt", { psbt: u82b64(bytes), signInputs, broadcast: false });
+        if (r.status !== "success") throw new Error(r.error?.message || "you cancelled the signature");
+        return b642u8(r.result.psbt);
+      },
+    });
+
+    const res = await apiFetch("/api/market/list", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inscriptionId, priceSats: offer.priceSats, psbt: offer.psbt }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || "could not list it");
+    $("mktPrice").value = "";
+    mktSay(`listed for ${fmtS(offer.priceSats)} — it stays yours until someone buys it`, "ok");
+    loadMarket();
+  } catch (e) {
+    mktSay(e?.message || String(e), "err");
+  } finally { $("mktListBtn").disabled = false; }
 };
 
 // ---------------------------------------------------------------------------
