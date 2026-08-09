@@ -100,6 +100,7 @@
     <button class="tab" data-view="scribers">PathScribers</button>
     <button class="tab" data-view="parcels">Parcels</button>
     <button class="tab" data-view="orders">Orders</button>
+    <button class="tab" data-view="bugs">Bugs</button>
     <button class="tab" data-view="prompt">AI prompt</button>
     <button class="tab" data-view="access">Access</button>
   </div>
@@ -149,6 +150,12 @@
   <div class="view" id="v-orders">
     <div class="cards" id="orderCards"></div>
     <div class="box"><h3>Every order</h3><div id="orderTable" class="empty">loading…</div></div>
+  </div>
+
+  <div class="view" id="v-bugs">
+    <div class="cards" id="bugCards"></div>
+    <div class="box"><h3>Reports</h3><div id="bugTable" class="empty">loading…</div>
+      <p class="hint">Sent from inside the app by signed-in wallets. The address is taken from the session, not typed — a report can't be filed under someone else's name. Deleting one is permanent.</p></div>
   </div>
 
   <div class="view" id="v-prompt">
@@ -265,6 +272,31 @@ async function loadAll(refresh = false) {
   loadScribers();
   loadParcels();
   loadPrompt();
+  loadBugs();
+}
+
+async function loadBugs() {
+  try {
+    const d = await api("/api/admin/bugs");
+    $("bugCards").innerHTML = [["reports", d.stats.total], ["people", d.stats.reporters]]
+      .map(([l, v]) => `<div class="card"><span class="big">${v}</span><span class="lbl">${l}</span></div>`).join("");
+    $("bugTable").className = "";
+    $("bugTable").innerHTML = d.bugs.length ? `<table>
+      <thead><tr><th>when</th><th>from</th><th>report</th><th></th></tr></thead>
+      <tbody>${d.bugs.map((b) => `<tr>
+        <td style="white-space:nowrap">${when(b.at)}</td>
+        <td class="owner">${esc(b.address)}</td>
+        <td style="white-space:pre-wrap">${esc(b.text)}</td>
+        <td style="text-align:right"><button class="btn small danger" data-bug="${esc(b.id)}">delete</button></td>
+      </tr>`).join("")}</tbody></table>` : `<div class="empty">no reports yet</div>`;
+    for (const btn of $("bugTable").querySelectorAll("[data-bug]")) {
+      btn.onclick = async () => {
+        if (!confirm("Delete this report? It cannot be brought back.")) return;
+        try { await api(`/api/admin/bugs/${encodeURIComponent(btn.dataset.bug)}`, { method: "DELETE" }); loadBugs(); }
+        catch (e) { alert(e.message); }
+      };
+    }
+  } catch (e) { $("bugTable").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
 }
 
 async function loadOverview() {

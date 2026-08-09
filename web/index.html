@@ -27,6 +27,21 @@
      collapses to 0x0, which is exactly what happened the first time */
   #promptBtn{padding:6px 9px}
   #promptBtn svg{width:17px;height:17px;display:block}
+  /* bug report: an icon, not a button — quiet grey until you look at it */
+  .iconGhost{background:none;border:0;padding:5px;margin:0;cursor:pointer;color:var(--muted);
+    display:grid;place-items:center;opacity:.7;transition:color .12s,opacity .12s}
+  .iconGhost:hover{color:var(--ink);opacity:1}
+  #bugBtn svg{width:17px;height:17px;display:block}
+  /* the popup hangs off the icon rather than taking over the screen */
+  #bugPop{position:fixed;z-index:70;width:min(320px,92vw);background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;padding:11px 12px;box-shadow:0 12px 32px #000b}
+  #bugPop h4{margin:0 0 7px;font-size:12.5px;color:var(--accent);display:flex;align-items:center;gap:8px}
+  #bugPop textarea{width:100%;min-height:96px;resize:vertical;background:var(--paper);border:1px solid var(--line);
+    border-radius:8px;color:var(--ink);padding:8px 10px;font:12.5px/1.55 system-ui,Segoe UI,Roboto,sans-serif;outline:none}
+  #bugPop textarea:focus{border-color:var(--accent)}
+  #bugPop .foot{display:flex;align-items:center;gap:8px;margin-top:8px}
+  #bugPop .lbl{color:var(--muted);font-size:11px}
+  #bugPop .lbl.ok{color:var(--ok)} #bugPop .lbl.err{color:var(--bad)}
   #imgToggle .slash{display:none;stroke:var(--bad)}
   #imgToggle.off{border-color:var(--bad);color:var(--bad)}
   #imgToggle.off .slash{display:block}
@@ -456,6 +471,15 @@
   <button id="exploreBtn" class="btn primary">Explore</button>
   <span id="crawlInfo" style="color:var(--muted);font-size:12.5px"></span>
   <span style="flex:1"></span>
+  <button id="bugBtn" class="iconGhost" title="Report a bug" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m8 2 1.88 1.88M14.12 3.88 16 2"/>
+      <path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/>
+      <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z"/>
+      <path d="M12 20v-9M6.53 9A3.99 3.99 0 0 1 3 5M6 13H2M3 21c0-2.1 1.7-3.9 3.8-4"/>
+      <path d="M21 5a4 4 0 0 1-3.5 4M22 13h-4M17.2 17c2.1.1 3.8 1.9 3.8 4"/>
+    </svg>
+  </button>
   <button id="promptBtn" class="btn iconbtn" title="How the AI is instructed — read it, and add your own">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M19 17V5a2 2 0 0 0-2-2H4"/>
@@ -477,6 +501,12 @@
     <p class="dim small">Anthropic's API doesn't let a key query its own balance or total spend, so these totals are tracked locally in this browser. Cost is an estimate at list prices (cache reads bill 0.1× input, cache writes 1.25×).</p>
     <div class="row"><span style="flex:1"></span><button id="resetUsageBtn" class="btn small">Reset totals</button></div>
   </div>
+</div>
+<div id="bugPop" hidden>
+  <h4>Report a bug<span style="flex:1"></span><button id="bugClose" class="iconGhost" title="Close">✕</button></h4>
+  <textarea id="bugText" spellcheck="false" placeholder="What went wrong? What were you doing when it happened?"></textarea>
+  <div class="foot"><span class="lbl" id="bugMsg">Sent with your wallet address so we can reply.</span>
+    <span style="flex:1"></span><button id="bugSend" class="btn primary small">Send</button></div>
 </div>
 <div id="inscWrap">
   <div id="inscPanel">
@@ -740,10 +770,12 @@
       <label class="lbl" for="treeSort">sort</label>
       <select id="treeSort" title="how the children and reinscriptions under each row are ordered">
         <option value="default">default</option>
-        <option value="newest">newest first</option>
-        <option value="oldest">oldest first</option>
-        <option value="children">most children</option>
-        <option value="reins">most reinscriptions</option>
+        <option value="newest" title="newest first">↓</option>
+        <option value="oldest" title="oldest first">↑</option>
+        <option value="children" title="most children first">children</option>
+        <option value="reins" title="most reinscriptions first">reinscriptions</option>
+        <option value="parents" title="most parents first">parents</option>
+        <option value="own" title="the ones your wallet holds first, otherwise the default order">own</option>
       </select></div>
     <div id="treeWrap"><ul id="fileTree" class="ftree"></ul></div>
     <div id="splitBar" title="drag to resize the tree / content viewer"></div>
@@ -768,7 +800,7 @@
       <span><b>▢</b> child / parcel</span>
       <span><b style="color:var(--rein)">↻</b> reinscription</span>
       <span><b style="color:var(--neighbor)">⬆</b> parent (climbs upward)</span>
-      <span><b style="color:var(--ok)">✓</b> owned by your wallet</span>
+      <span><b style="color:var(--accent)">+</b> yours — inscribe from it</span>
       <span>click = preview · expand = children</span>
     </div>
   </section>
@@ -1282,12 +1314,16 @@ function buildTreeIndex() {
   const at = (id) => byId.get(id)?.timestamp ?? 0;
   const countKids = (id) => (kids.get(id) || []).length;
   const countReins = (id) => (reins.get(id) || []).length;
+  const countParents = (id) => (parentsOf.get(id) || []).length;
   const cmp = {
     default: byNumber,
     newest: (a, b) => at(b) - at(a) || byNumber(a, b),
     oldest: (a, b) => at(a) - at(b) || byNumber(a, b),
     children: (a, b) => countKids(b) - countKids(a) || byNumber(a, b),
     reins: (a, b) => countReins(b) - countReins(a) || byNumber(a, b),
+    parents: (a, b) => countParents(b) - countParents(a) || byNumber(a, b),
+    // yours float to the top, everything else keeps the default order
+    own: (a, b) => (ownedByMe(byId.get(b)) ? 1 : 0) - (ownedByMe(byId.get(a)) ? 1 : 0) || byNumber(a, b),
   }[treeSort] || byNumber;
   for (const l of kids.values()) l.sort(cmp);
   for (const l of reins.values()) l.sort(cmp);
@@ -1758,6 +1794,9 @@ function updateWalletUi() {
   // address button = who you are + which mode; Orders button = how many questions
   $("walletBtn").textContent = w ? `${w.address.slice(0, 6)}…${w.address.slice(-4)}${useKeyMode() ? " · key" : " · questions"}` : "Connect wallet";
   $("walletBtn").classList.toggle("setok", !!w); // green = signed in
+  // reporting a bug needs a proven wallet — no session, no icon
+  $("bugBtn").hidden = !state.token;
+  if (!state.token && !$("bugPop").hidden) $("bugPop").hidden = true;
   $("ordersBtn").style.display = w ? "" : "none";
   $("ordersBtn").textContent = `Orders | ${state.balance.questions + state.balance.freeLeft}`;
   renderChatStatus();
@@ -2269,6 +2308,43 @@ $("treeSort").onchange = () => {
   treeSort = $("treeSort").value;
   localStorage.setItem("bac_treesort", treeSort);
   if (state.graph) renderTree();
+};
+
+// Bug report — the icon only exists for a signed-in wallet, and the popup
+// hangs directly under it. The address is added server-side, never typed.
+function openBugPop() {
+  const r = $("bugBtn").getBoundingClientRect();
+  const pop = $("bugPop");
+  pop.hidden = false;
+  pop.style.top = `${Math.round(r.bottom + 8)}px`;
+  pop.style.right = `${Math.round(window.innerWidth - r.right)}px`;
+  $("bugMsg").className = "lbl";
+  $("bugMsg").textContent = "Sent with your wallet address so we can reply.";
+  $("bugText").focus();
+}
+const closeBugPop = () => { $("bugPop").hidden = true; };
+$("bugBtn").onclick = (e) => { e.stopPropagation(); $("bugPop").hidden ? openBugPop() : closeBugPop(); };
+$("bugClose").onclick = closeBugPop;
+$("bugPop").addEventListener("click", (e) => e.stopPropagation());
+document.addEventListener("click", () => { if (!$("bugPop").hidden) closeBugPop(); });
+window.addEventListener("resize", () => { if (!$("bugPop").hidden) openBugPop(); });
+$("bugSend").onclick = async () => {
+  const text = $("bugText").value.trim();
+  const say = (t, cls = "") => { $("bugMsg").className = `lbl ${cls}`; $("bugMsg").textContent = t; };
+  if (text.length < 3) return say("tell us what went wrong first", "err");
+  $("bugSend").disabled = true;
+  say("sending…");
+  try {
+    const res = await apiFetch("/api/bugs", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || "could not send it");
+    $("bugText").value = "";
+    say("thank you — it reached us", "ok");
+    setTimeout(() => { if (!$("bugPop").hidden) closeBugPop(); }, 1600);
+  } catch (e) { say(e?.message || String(e), "err"); }
+  finally { $("bugSend").disabled = false; }
 };
 
 // 📜 instructions panel

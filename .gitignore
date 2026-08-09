@@ -6,3 +6,4 @@ node_modules/
 .admin.json
 .system-prompt.txt
 .claims.json
+.bugs.json

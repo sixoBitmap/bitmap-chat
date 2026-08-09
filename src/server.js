@@ -17,6 +17,7 @@ import {
 } from "./wallet.js";
 import { addClaim, claimIndex, removeClaim } from "./claims.js";
 import { mountInscribe } from "./inscribe.js";
+import { addBug, listBugs, deleteBug, bugStats, BUG_MAX } from "./bugs.js";
 import { makeChallenge, verifyChallenge, walletAuth } from "./auth.js";
 import {
   PACKS, PAY_ADDRESS, quote, createOrder, attachTx, listOrders, sweepOrders,
@@ -420,6 +421,15 @@ app.get("/api/orders/quote", orderLimiter, async (req, res) => {
   }
 });
 
+// Report a bug. The reporter sends only text — the address comes from their
+// proven session, so nobody can file a report as somebody else.
+const bugLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+app.post("/api/bugs", bugLimiter, (req, res) => {
+  if (needWallet(req, res)) return;
+  try { const b = addBug(req.walletAddr, req.body?.text); res.json({ ok: true, id: b.id, max: BUG_MAX }); }
+  catch (e) { res.status(e.code || 500).json({ error: e.message || "could not save that" }); }
+});
+
 // Chain reads, coin lookup and broadcast for the in-page inscribe tool.
 mountInscribe(app, { requireWallet: needWallet });
 
@@ -596,6 +606,14 @@ app.post("/api/admin/prompt", adminLimiter, requireAdmin, (req, res) => {
   catch (e) { res.status(e.code || 500).json({ error: e.message || "could not save the prompt" }); }
 });
 app.delete("/api/admin/prompt", adminLimiter, requireAdmin, (req, res) => res.json(resetPrompt()));
+
+// Bug reports — admins read and delete them; nobody else can see them at all.
+app.get("/api/admin/bugs", adminLimiter, requireAdmin, (req, res) =>
+  res.json({ bugs: listBugs(), stats: bugStats() }));
+app.delete("/api/admin/bugs/:id", adminLimiter, requireAdmin, (req, res) => {
+  deleteBug(decodeURIComponent(req.params.id));
+  res.json({ bugs: listBugs(), stats: bugStats() });
+});
 
 // Who else may open the panel.
 app.post("/api/admin/admins", adminLimiter, requireAdmin, (req, res) => {
