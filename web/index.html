@@ -480,7 +480,12 @@
   #mktMsg.ok{color:var(--ok)} #mktMsg.err{color:var(--bad)}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chips .none{color:var(--muted);font-size:12.5px}
-  .pcPager{display:flex;gap:6px;align-items:center;width:100%;margin-top:4px}
+  /* parcels in an even two-column grid — flex-wrap left ragged rows because the
+     chips are different widths */
+  #pickerParcels{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start}
+  #pickerParcels > .btn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+  #pickerParcels > .none{grid-column:1/-1}
+  .pcPager{grid-column:1/-1;display:flex;gap:6px;align-items:center;margin-top:4px}
   .chips button{font-family:ui-monospace,Consolas,monospace}
   #pickerPanel .okmsg{color:var(--ok);font-size:13px;margin:10px 0 2px}
   #pickerPanel .dimmsg{color:var(--muted);font-size:12.5px;margin:8px 0 2px;line-height:1.4}
@@ -2482,7 +2487,7 @@ $("promptClear").onclick = () => {
 // stays yours to withdraw until someone spends it.
 // ---------------------------------------------------------------------------
 // Your parcels, six to a page — a full district is a hundred of them.
-const PARCELS_PER_PAGE = 6;
+const PARCELS_PER_PAGE = 10;   // two columns of five
 let parcelPage = 0;
 
 function renderParcelPage() {
