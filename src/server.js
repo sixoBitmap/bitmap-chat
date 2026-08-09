@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { MAX_INDEXED_BITMAP } from "./oci.js";
+import { MAX_INDEXED_BITMAP, gatewayStatus, fetchOrd } from "./oci.js";
 import { getCrawl, getCachedGraph } from "./crawler.js";
 import { startChat, chatErrorInfo, logUsage, overDailyLimit, contextFor, MODEL, MODELS } from "./chat.js";
 import { freeUsedToday, useFree, refundFree } from "./quota.js";
@@ -87,6 +87,16 @@ function parseBitmap(raw) {
 
 // --- routes -----------------------------------------------------------------
 app.get("/health", (req, res) => res.json({ ok: true }));
+
+// Which ord gateway is answering, and how far behind the chain it is. A mirror
+// that lags shows a stale world with no error anywhere, so this is worth being
+// able to see at a glance.
+app.get("/api/gateway", async (req, res) => {
+  const s = gatewayStatus();
+  let tip = null;
+  try { tip = Number(await fetchOrd("/r/blockheight")) || null; } catch { /* leave null */ }
+  res.json({ ...s, tip, note: tip ? "compare with mempool.space — a big gap means new inscriptions are invisible here" : null });
+});
 
 // UI status: does this deployment have its own key?
 app.get("/api/config", (req, res) => res.json({

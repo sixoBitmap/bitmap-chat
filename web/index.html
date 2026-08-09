@@ -480,6 +480,7 @@
   #mktMsg.ok{color:var(--ok)} #mktMsg.err{color:var(--bad)}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chips .none{color:var(--muted);font-size:12.5px}
+  .pcPager{display:flex;gap:6px;align-items:center;width:100%;margin-top:4px}
   .chips button{font-family:ui-monospace,Consolas,monospace}
   #pickerPanel .okmsg{color:var(--ok);font-size:13px;margin:10px 0 2px}
   #pickerPanel .dimmsg{color:var(--muted);font-size:12.5px;margin:8px 0 2px;line-height:1.4}
@@ -1933,9 +1934,7 @@ function openPicker() {
 
   // MIDDLE — parcels only ("x.114588.bitmap" canonical children)
   const inscChip = (p, label) => `<button class="btn small" data-insc="${escapeHtml(p.id)}" title="${escapeHtml(p.id)}">${escapeHtml(label)}</button>`;
-  $("pickerParcels").innerHTML = (w.parcels || []).length
-    ? w.parcels.map((p) => inscChip(p, p.text || `${gateNum()} parcel`)).join("")
-    : `<span class="none">none yet</span>`;
+  renderParcelPage();
 
   // RIGHT (top) — PathScribers, ABOVE the mint page
   $("pickerScribers").innerHTML = (w.pathscribers || []).length
@@ -2482,6 +2481,32 @@ $("promptClear").onclick = () => {
 // offer, and the server only remembers it. Selling is one signature; the offer
 // stays yours to withdraw until someone spends it.
 // ---------------------------------------------------------------------------
+// Your parcels, six to a page — a full district is a hundred of them.
+const PARCELS_PER_PAGE = 6;
+let parcelPage = 0;
+
+function renderParcelPage() {
+  const all = state.wallet?.parcels || [];
+  const pages = Math.max(1, Math.ceil(all.length / PARCELS_PER_PAGE));
+  parcelPage = Math.min(Math.max(0, parcelPage), pages - 1);
+  const slice = all.slice(parcelPage * PARCELS_PER_PAGE, (parcelPage + 1) * PARCELS_PER_PAGE);
+  const chip = (p, label) => `<button class="btn small" data-insc="${escapeHtml(p.id)}" title="${escapeHtml(p.id)}">${escapeHtml(label)}</button>`;
+  $("pickerParcels").innerHTML = all.length
+    ? slice.map((p) => chip(p, p.text || `${gateNum()} parcel`)).join("") +
+      (pages > 1 ? `<div class="pcPager">
+         <button class="btn small" id="pcPrev"${parcelPage === 0 ? " disabled" : ""}>‹</button>
+         <span class="lbl">${parcelPage + 1} / ${pages}</span>
+         <button class="btn small" id="pcNext"${parcelPage >= pages - 1 ? " disabled" : ""}>›</button>
+         <span class="lbl">${all.length} in total</span></div>` : "")
+    : `<span class="none">none yet</span>`;
+  const go = (d) => { parcelPage += d; renderParcelPage(); };
+  if ($("pcPrev")) $("pcPrev").onclick = () => go(-1);
+  if ($("pcNext")) $("pcNext").onclick = () => go(1);
+  for (const b of $("pickerParcels").querySelectorAll("[data-insc]")) {
+    b.onclick = () => window.open(`https://ordinals.com/inscription/${encodeURIComponent(b.dataset.insc)}`, "_blank", "noopener");
+  }
+}
+
 const mktSay = (t, cls = "") => { $("mktMsg").className = cls; $("mktMsg").textContent = t; };
 const fmtS = (n) => `${Number(n).toLocaleString("en-US")} sats`;
 

@@ -31,6 +31,15 @@ const DEFAULT_GATEWAYS = ["https://ordinals.com"];
 const GATEWAYS = (process.env.ORD_API || DEFAULT_GATEWAYS.join(","))
   .split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
 let preferredGateway = 0; // sticky: once a gateway works, keep using it
+// …but give the primary another chance regularly, so one bad minute doesn't
+// leave the app reading a stale mirror for the rest of its life
+const PRIMARY_RETRY_MS = Number(process.env.ORD_PRIMARY_RETRY_MS) || 60_000;
+let lastPrimaryTry = 0;
+export const gatewayStatus = () => ({
+  gateways: GATEWAYS,
+  using: GATEWAYS[preferredGateway] || null,
+  cooling: [...gatewayCooldown.entries()].filter(([, t]) => t > Date.now()).map(([gw]) => gw),
+});
 
 const BITMAP_INDEX_URLS = [
   "/content/01bba6c58af39d7f199aa2bceeaaba1ba91b23d2663bc4ef079a4b5e442dbf74i0",
@@ -87,6 +96,14 @@ const gatewayCooldown = new Map(); // gw -> epoch ms until which we skip it
 // last. Returns the raw Response; throws with .status/.retryAfter/.notFound.
 async function fetchOrdResponse(path) {
   let lastErr;
+  // Sticky, but not permanently. A single failure on the FIRST gateway used to
+  // demote it forever, which silently pinned the whole app to a fallback node —
+  // and a fallback that lags the chain shows a stale world with no error at
+  // all. So the preferred gateway is retried from the top periodically.
+  if (preferredGateway !== 0 && Date.now() - lastPrimaryTry > PRIMARY_RETRY_MS) {
+    lastPrimaryTry = Date.now();
+    preferredGateway = 0;
+  }
   for (let i = 0; i < GATEWAYS.length; i++) {
     const gw = GATEWAYS[(preferredGateway + i) % GATEWAYS.length];
     const coolUntil = gatewayCooldown.get(gw) || 0;
