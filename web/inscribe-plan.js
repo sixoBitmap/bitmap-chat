@@ -209,6 +209,72 @@ export function planInscription(o) {
   };
 }
 
+// BATCH: many children of one parent in a single reveal.
+//
+// One tapscript can carry several envelopes; ord assigns each to a sat by its
+// own pointer. So minting 20 parcels costs one parent input, one commit and
+// one reveal instead of twenty of everything.
+//
+// The layout is the child layout repeated: the parent returns whole on output
+// 0, then one output per new inscription, and pointer[i] is the total value of
+// every output before it.
+export function planBatch(o) {
+  const { anchor, ordAddress, items } = o;
+  if (!ordAddress) bad("connect your wallet first", "wallet");
+  if (!anchor?.id || !ID_RE.test(anchor.id)) bad("no usable parent inscription", "anchor");
+  utxoOk(anchor, "the parent");
+  if (anchor.address !== ordAddress) {
+    bad(`the parent sits in ${anchor.address || "another wallet"} — only its holder can give it children`, "not-yours");
+  }
+  if (!Array.isArray(items) || !items.length) bad("nothing selected to inscribe", "empty");
+
+  const post = Number(o.postage ?? DUST);
+  if (!Number.isInteger(post) || post < MIN_OUT) bad(`postage must be at least ${MIN_OUT} sats`, "postage");
+
+  // one reveal can only get so big before it stops being relayable
+  const MAX_ITEMS = Number(o.maxItems) || 40;
+  if (items.length > MAX_ITEMS) bad(`too many at once — ${MAX_ITEMS} is the limit per transaction`, "too-many");
+
+  const ins = [{ ...anchor, role: "anchor" }];
+  const outs = [{ to: ordAddress, value: anchor.value, role: "parent", id: anchor.id }];
+  const envelopes = [];
+  let bytes = 0;
+
+  items.forEach((item, i) => {
+    const text = String(item?.text ?? "");
+    if (!text) bad(`item ${i + 1} is empty`, "empty-item");
+    const contentType = item.contentType || "text/plain;charset=utf-8";
+    // pointer = everything paid out before this inscription's own output
+    const pointer = outs.reduce((s, x) => s + x.value, 0);
+    outs.push({ to: ordAddress, value: post, role: "inscription", label: text });
+    envelopes.push({ tags: { contentType, parent: anchor.id, pointer }, text });
+    bytes += new TextEncoder().encode(text).length;
+  });
+
+  if (bytes > MAX_BODY) bad(`that is ${bytes.toLocaleString("en-US")} bytes of content — too much for one transaction`, "too-big");
+
+  const outTotal = outs.reduce((s, x) => s + x.value, 0);
+  const inTotal = ins.reduce((s, x) => s + x.value, 0);
+
+  // --- invariants -------------------------------------------------------------
+  outs.forEach((out, idx) => {
+    if (out.value < MIN_OUT) bad("internal: an output is below the dust floor", "bug-dust");
+    if (out.role !== "inscription") return;
+    const before = outs.slice(0, idx).reduce((s, x) => s + x.value, 0);
+    const env = envelopes[idx - 1];
+    if (env.tags.pointer !== before) bad(`internal: pointer ${env.tags.pointer} misses its output (${before})`, "bug-pointer");
+    if (env.tags.pointer >= outTotal) bad("internal: a pointer falls outside the outputs", "bug-pointer-lost");
+  });
+  if (outs[0].value !== anchor.value) bad("internal: the parent is not returned whole", "bug-return");
+  if (outTotal - inTotal !== post * items.length) bad("internal: inputs and outputs do not balance", "bug-balance");
+
+  return {
+    relation: "batch", count: items.length, postage: post,
+    parentId: anchor.id, ins, outs, envelopes, inTotal, outTotal, bytes,
+    commitValue: (revealFee) => Math.max(360, revealFee + post * items.length),
+  };
+}
+
 // Human-readable one-liner for the review screen.
 export const describePlan = (p) =>
   p.relation === "reinscription"

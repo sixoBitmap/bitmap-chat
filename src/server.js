@@ -584,7 +584,17 @@ app.get("/api/admin/parcels", adminLimiter, requireAdmin, async (req, res) => {
     const ids = [...g.parcelById.keys()];
     const rows = (await describeHolders(ids)).map((r) => ({ ...r, parcel: g.parcelById.get(r.id)?.text || null }));
     rows.sort((a, b) => (g.parcelById.get(a.id)?.x ?? 0) - (g.parcelById.get(b.id)?.x ?? 0));
-    res.json({ gateBitmap: GATE_BITMAP, txCount: g.txCount, minted: rows.length, holders: new Set(rows.map((r) => r.owner).filter(Boolean)).size, rows });
+    // which of 0..txCount-1 nobody has claimed yet — the mintable set
+    const claimed = new Set([...g.parcelById.values()].map((p) => p.x));
+    const unminted = [];
+    for (let x = 0; x < g.txCount; x++) if (!claimed.has(x)) unminted.push(x);
+    res.json({
+      gateBitmap: GATE_BITMAP, txCount: g.txCount, minted: rows.length,
+      holders: new Set(rows.map((r) => r.owner).filter(Boolean)).size,
+      rows, unminted,
+      // the parent every parcel must be inscribed under
+      parentId: g.parentId || null,
+    });
   } catch (e) { res.status(502).json({ error: e?.message || "could not read parcels" }); }
 });
 

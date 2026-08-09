@@ -78,6 +78,25 @@ export function verifyEnvelope(btc, ordl, script, plan) {
   return got[0];
 }
 
+// Same proof for a batch: decode the script we are about to pay for and check
+// every envelope came out with the parent and pointer it was meant to have.
+export function verifyBatch(btc, ordl, script, plan) {
+  const got = ordl.parseInscriptions(btc.Script.decode(script), true);
+  if (!got || got.length !== plan.envelopes.length) {
+    throw new Error(`the script holds ${got?.length ?? 0} inscriptions, not the ${plan.envelopes.length} intended`);
+  }
+  const dec = new TextDecoder();
+  plan.envelopes.forEach((want, i) => {
+    const t = got[i].tags || {};
+    if (Number(t.pointer ?? -1) !== Number(want.tags.pointer)) {
+      throw new Error(`inscription ${i + 1}: pointer encoded ${t.pointer}, meant ${want.tags.pointer}`);
+    }
+    if (t.parent !== want.tags.parent) throw new Error(`inscription ${i + 1}: the parent did not survive encoding`);
+    if (dec.decode(got[i].body) !== want.text) throw new Error(`inscription ${i + 1}: the content did not survive encoding`);
+  });
+  return got;
+}
+
 /**
  * Build and sign both transactions. Broadcasts nothing.
  * @returns {{commitHex,commitTxid,revealHex,revealTxid,newInscriptionId,fees}}
@@ -87,12 +106,22 @@ export async function buildInscribeTxs({ plan, body, feeRate, pay, ordPubkey, ut
   const NET = btc.NETWORK;
   const ordAddr = plan.outs[0].to;
 
-  onStep?.("Building the inscription…");
-  const envelope = buildEnvelope(plan, body);
+  onStep?.(plan.envelopes ? `Building ${plan.count} inscriptions…` : "Building the inscription…");
+  // A batch plan carries many envelopes in one tapscript, each with its own
+  // pointer; a single plan carries one. Everything downstream is identical.
+  const enc = new TextEncoder();
+  const envelopes = plan.envelopes
+    ? plan.envelopes.map((e) => ({
+        tags: { contentType: e.tags.contentType, parent: e.tags.parent, pointer: BigInt(e.tags.pointer) },
+        body: enc.encode(e.text),
+      }))
+    : [buildEnvelope(plan, body)];
   const priv = crypto.getRandomValues(new Uint8Array(32));
   const pub = schnorr.getPublicKey(priv);
-  const revealP = btc.p2tr(undefined, ordl.p2tr_ord_reveal(pub, [envelope]), NET, false, [ordl.OutOrdinalReveal]);
-  verifyEnvelope(btc, ordl, ordl.p2tr_ord_reveal(pub, [envelope]).script, plan);
+  const revealScript = ordl.p2tr_ord_reveal(pub, envelopes);
+  const revealP = btc.p2tr(undefined, revealScript, NET, false, [ordl.OutOrdinalReveal]);
+  if (plan.envelopes) verifyBatch(btc, ordl, revealScript.script, plan);
+  else verifyEnvelope(btc, ordl, revealScript.script, plan);
 
   // assemble the reveal: every planned input, then the commit, then the outputs
   const mkReveal = (ins, commitTxid, commitVal) => {
@@ -184,8 +213,9 @@ export async function buildInscribeTxs({ plan, body, feeRate, pay, ordPubkey, ut
   return {
     commitHex, commitTxid,
     revealHex: u82hex(rSigned.extract()), revealTxid,
-    // the new inscription is the first (and only) envelope in the reveal
+    // envelopes are numbered in order within the reveal transaction
     newInscriptionId: `${revealTxid}i0`,
+    newInscriptionIds: envelopes.map((_, i) => `${revealTxid}i${i}`),
     fees: { reveal: revealFee, commit: commitFee, commitValue: Number(commitValue), postage: plan.postage,
             total: revealFee + commitFee + plan.postage },
   };

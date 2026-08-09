@@ -85,7 +85,9 @@ export async function gateData() {
       }
       const parcelById = new Map(); // canonical child id -> { x, text, number }
       for (const [x, v] of best) parcelById.set(v.id, { x, text: v.text, number: v.number });
-      const data = { childIds: new Set(ids), parcelById, txCount: blockTxCount };
+      // parentId travels with the data: minting a parcel means inscribing a
+      // child under exactly this inscription
+      const data = { childIds: new Set(ids), parcelById, txCount: blockTxCount, parentId };
       gateCache = { at: Date.now(), data };
       console.log(`gate ${GATE_BITMAP}.bitmap: ${ids.length} children, ${parcelById.size}/${blockTxCount} canonical parcels, live from ordinals.com`);
       return data;
